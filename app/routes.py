@@ -2,6 +2,9 @@ from flask import render_template, request, jsonify
 from app import app
 from app import database as db_helper
 
+# Defines HTTP endpoints (URLs) for the app.
+# Connects database operations to HTTP requests.
+
 @app.route("/")
 def homepage():
     items = db_helper.fetch_todo()

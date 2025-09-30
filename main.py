@@ -1,3 +1,5 @@
+# Entry point for Flask app.
+# Needed for Docker and local testing.
 from app import app
 
 if __name__ == '__main__':

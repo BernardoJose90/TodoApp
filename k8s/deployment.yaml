@@ -1,7 +1,12 @@
+# Defines Kubernetes Deployment:
+# Number of replicas
+# Docker image to use
+# Environment variables
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: todo-app-deployment
+  name: todo-app
 spec:
   replicas: 2
   selector:
@@ -14,11 +19,19 @@ spec:
     spec:
       containers:
       - name: todo-app
-        image: <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/todo-app:latest
+        image: <your-dockerhub-username>/odo-list-app:latest
         ports:
         - containerPort: 5000
-        envFrom:
-        - configMapRef:
-            name: todo-config
-        - secretRef:
-            name: todo-secrets
+        env:
+        - name: AWS_REGION
+          value: "eu-west-2"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: access_key
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-credentials
+              key: secret_key

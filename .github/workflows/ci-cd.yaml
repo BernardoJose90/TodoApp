@@ -1,0 +1,52 @@
+# Workflow Steps:
+
+# Trigger: on push to main.
+
+# Checkout: fetch repo code.
+
+# Configure AWS credentials: from GitHub Secrets.
+
+# Login to ECR: Amazon Elastic Container Registry.
+
+# Build Docker image locally and push to ECR.
+
+# Deploy to EKS: Update Kubernetes Deployment with the new image and roll out changes.
+
+# This automates build → push → deploy for every commit.
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: <REGION>
+
+    - name: Login to ECR
+      run: |
+        aws ecr get-login-password --region <REGION> | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
+
+    - name: Build and Push Docker Image
+      run: |
+        docker build -t todo-app .
+        docker tag todo-app:latest <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/todo-app:latest
+        docker push <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/todo-app:latest
+
+    - name: Deploy to EKS
+      env:
+        KUBECONFIG: ${{ secrets.KUBECONFIG }}
+      run: |
+        kubectl set image deployment/todo-app-deployment todo-app=<AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/todo-app:latest
+        kubectl rollout status deployment/todo-app-deployment

@@ -1,3 +1,8 @@
+//Handles front-end interactions
+//Submit a new task (POST /create)
+//Delete a task (POST /delete/<id>)
+//Uses jQuery for DOM manipulation and AJAX calls.
+
 $(document).ready(function () {
     $('#submit-task').click(function () {
         let desc = $('#task-desc').val();

@@ -1,3 +1,8 @@
+# Containerizes Flask app.
+# Installs dependencies.
+# Exposes port 5000 for web traffic.
+# Starts Flask server.
+
 FROM python:3.11-slim
 
 WORKDIR /app
