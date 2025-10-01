@@ -1,11 +1,3 @@
-# Main HTML page for your TODO list.
-
-# Uses Bootstrap for styling and layout.
-
-# Includes modal for adding/editing tasks.
-
-# Loads modal.js and custom.css.
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -14,21 +6,44 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 </head>
 <body>
 <div class="container mt-5">
   <h1>TODO List</h1>
-  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#task-modal" data-source="New Task">Add Task</button>
+  
+  <!-- Add Task Button -->
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#task-modal">Add Task</button>
+
+  <!-- Filters -->
+  <div class="btn-group mt-3 mb-2" role="group">
+    <button class="btn btn-secondary filter" data-status="All">All</button>
+    <button class="btn btn-secondary filter" data-status="Todo">Todo</button>
+    <button class="btn btn-secondary filter" data-status="In Progress">In Progress</button>
+    <button class="btn btn-secondary filter" data-status="Done">Done</button>
+  </div>
+
+  <!-- Tasks Table -->
   <table class="table mt-3">
     <thead>
-      <tr><th>#</th><th>Task</th><th>Status</th><th>Edit</th><th>Delete</th></tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
       <tr>
+        <th>#</th>
+        <th>Task</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Due Date</th>
+        <th>Edit</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody id="task-table-body">
+      {% for item in items %}
+      <tr data-id="{{item.id}}" data-status="{{item.status}}">
         <td>{{item.id}}</td>
         <td>{{item.task}}</td>
         <td>{{item.status}}</td>
+        <td>{{item.priority}}</td>
+        <td>{{item.due_date}}</td>
         <td><button class="btn btn-info btn-sm edit" data-id="{{item.id}}">Edit</button></td>
         <td><button class="btn btn-danger btn-sm delete" data-id="{{item.id}}">Delete</button></td>
       </tr>
@@ -43,7 +58,18 @@
     <div class="modal-content">
       <div class="modal-header"><h5 class="modal-title">Add/Edit Task</h5></div>
       <div class="modal-body">
-        <input type="text" id="task-desc" class="form-control">
+        <input type="text" id="task-desc" class="form-control mb-2" placeholder="Task description">
+        <select id="task-status" class="form-control mb-2">
+          <option value="Todo">Todo</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Done">Done</option>
+        </select>
+        <select id="task-priority" class="form-control mb-2">
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
+        <input type="date" id="task-due-date" class="form-control">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" id="submit-task">Save</button>
@@ -51,6 +77,33 @@
     </div>
   </div>
 </div>
+
 <script src="{{ url_for('static', filename='script/modal.js') }}"></script>
+<script>
+  // DRAG-AND-DROP
+  new Sortable(document.getElementById('task-table-body'), {
+    animation: 150,
+    onEnd: function(evt) {
+      let order = [];
+      document.querySelectorAll('#task-table-body tr').forEach((row, index) => {
+        order.push({id: row.dataset.id, position: index});
+      });
+      console.log('New order:', order);
+      // TODO: Send 'order' to server via fetch() to update DB positions
+    }
+  });
+
+  // FILTER BUTTONS
+  $('.filter').on('click', function() {
+    const status = $(this).data('status');
+    $('#task-table-body tr').each(function() {
+      if (status === 'All' || $(this).data('status') === status) {
+        $(this).show();
+      } else {
+        $(this).hide();
+      }
+    });
+  });
+</script>
 </body>
 </html>
