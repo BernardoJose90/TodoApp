@@ -1,7 +1,13 @@
+import os
 from datetime import date
 from sqlalchemy import create_engine, Column, Integer, String, Enum, Date
 from sqlalchemy.orm import declarative_base, sessionmaker
-from app.secrets_local import get_secret
+
+# Dynamically choose which secrets module to use(LOCAL or AWS)
+if os.getenv("ENV") == "LOCAL":
+    from app.secrets import get_secret  # fetches from AWS Secrets Manager
+else:
+    from app.secrets_local import get_secret  # local testing
 
 # Load database credentials
 secret = get_secret()
@@ -14,7 +20,9 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 # Declare ORM base
 Base = declarative_base()
 
+# ===========================
 # Define Task model
+# ===========================
 class Task(Base):
     __tablename__ = "tasks"
 
@@ -25,13 +33,12 @@ class Task(Base):
     due_date = Column(Date, nullable=True)
     position = Column(Integer, nullable=True)  # For drag-and-drop ordering
 
-# Create tables if not exist
+# Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
 # ===========================
 # Database helper functions
 # ===========================
-
 def fetch_todo(order_by_position=True, filter_status=None):
     """Fetch all tasks, optionally filtering by status."""
     with SessionLocal() as session:
@@ -45,7 +52,7 @@ def fetch_todo(order_by_position=True, filter_status=None):
         return [
             {
                 "id": task.id,
-                "task": task.description,  # <--- map description to task
+                "task": task.description,
                 "status": task.status,
                 "priority": task.priority,
                 "due_date": task.due_date,

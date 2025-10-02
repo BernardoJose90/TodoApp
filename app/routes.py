@@ -1,5 +1,5 @@
 from flask import render_template, request, jsonify
-from app import app
+from ap import app
 from app import database as db_helper
 
 @app.route("/")

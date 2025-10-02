@@ -2,9 +2,11 @@ import json
 import boto3
 from botocore.exceptions import ClientError
 
-# Fetches database credentials from AWS Secrets Manager keeping sensitive info out of your code.
-
 def get_secret():
+    """
+    Fetches database credentials from AWS Secrets Manager
+    and returns them in the same format as secrets_local.py
+    """
     secret_name = "todo-db-secret"
     region_name = "eu-west-2"
 
@@ -22,5 +24,13 @@ def get_secret():
     except ClientError as e:
         raise e
 
+    # Parse the secret JSON string from AWS
     secret = json.loads(get_secret_value_response['SecretString'])
-    return secret
+
+    # Ensure it matches the local format
+    return {
+        "username": secret.get("username"),
+        "password": secret.get("password"),
+        "host": secret.get("host"),
+        "dbname": secret.get("dbname")
+    }
