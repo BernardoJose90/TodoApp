@@ -23,7 +23,7 @@ jobs:
         role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
         aws-region: eu-west-2
 
-    # Optional: Debug OIDC token (for troubleshooting)
+    # Optional: Debug OIDC token (troubleshooting)
     - name: Debug OIDC token
       run: |
         echo "OIDC token request URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
