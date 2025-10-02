@@ -52,7 +52,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: eu-west-2
 
-      # 6️⃣a Authorization check: validate permission
+      # 6️⃣a Authorization check: validate permission.
       - name: Validate kubeconfig permissions
         run: |
           echo "Checking if we can get nodes:"
