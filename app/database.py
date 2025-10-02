@@ -22,7 +22,7 @@ Base = declarative_base()
 
 # ===========================
 # Define Task model
-# ===========================
+# ==========================
 class Task(Base):
     __tablename__ = "tasks"
 
