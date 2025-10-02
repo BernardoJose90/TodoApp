@@ -31,7 +31,10 @@ jobs:
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
-          
+
+      - name: Check AWS identity
+        run: aws sts get-caller-identity
+
       - name: Deploy to EKS
         run: |
           # Generate kubeconfig (do NOT pass --role-arn)
@@ -43,6 +46,7 @@ jobs:
 
           # Wait for rollout to complete
           kubectl rollout status deployment/todo-app-deployment
+
 
 
 
