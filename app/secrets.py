@@ -10,7 +10,7 @@ def get_secret():
     secret_name = "todo-db-secret"
     region_name = "eu-west-2"
 
-    # Create a Secrets Manager client.
+    # Create a Secrets Manager client
     session = boto3.session.Session()
     client = session.client(
         service_name='secretsmanager',
