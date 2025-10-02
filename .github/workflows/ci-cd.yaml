@@ -13,18 +13,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Configure AWS OIDC credentials
+      # 2️⃣ Configure AWS credentials using OIDC
       - name: Configure AWS OIDC credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      # 3️⃣ Debug: confirm the runner assumed the role
+      # 3️⃣ Debug: confirm the runner assumed the role correctly
       - name: Debug AWS credentials
         run: |
           echo "Caller identity:"
@@ -43,15 +43,19 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig dynamically (EKS Auto Mode)
-      - name: Generate kubeconfig
+      # 6️⃣ Generate kubeconfig explicitly using the OIDC role
+      - name: Generate kubeconfig (EKS Auto Mode)
         run: |
           rm -f ~/.kube/config
-          aws eks update-kubeconfig --name Todo-list-App-cluster --region eu-west-2
+          aws eks update-kubeconfig \
+            --name Todo-list-App-cluster \
+            --region eu-west-2 \
+            --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           echo "Kubeconfig generated successfully."
-          aws sts get-caller-identity   # confirm credentials in kubeconfig
-          kubectl auth can-i get nodes   # sanity check access
+          kubectl version --short
           kubectl get nodes
+        env:
+          AWS_DEFAULT_REGION: eu-west-2
 
       # 7️⃣ Deploy Docker image to EKS
       - name: Deploy to EKS
@@ -59,11 +63,15 @@ jobs:
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
           kubectl rollout status deployment/todo-app-deployment
+        env:
+          AWS_DEFAULT_REGION: eu-west-2
 
-      # 8️⃣ Optional: Verify deployment
+      # 8️⃣ Verify deployment
       - name: Verify Deployment
         run: |
           kubectl get pods
           kubectl get services
           kubectl describe service todo-app-service
           kubectl get events --sort-by=.metadata.creationTimestamp
+        env:
+          AWS_DEFAULT_REGION: eu-west-2
