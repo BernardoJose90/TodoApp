@@ -61,7 +61,7 @@ jobs:
           kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
           kubectl rollout status deployment/todo-app-deployment
 
-      # 9️⃣ Verify deployment
+      # 9️⃣ Verify deployment.
       - name: Verify Deployment
         run: |
           kubectl get pods
