@@ -49,8 +49,7 @@ jobs:
           rm -f ~/.kube/config
           aws eks update-kubeconfig \
             --name Todo-list-App-cluster \
-            --region eu-west-2 \
-            --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+            --region eu-west-2 
           echo "Kubeconfig generated successfully."
           kubectl get nodes
         env:
