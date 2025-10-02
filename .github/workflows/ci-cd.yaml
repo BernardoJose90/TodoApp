@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
+      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -24,7 +24,7 @@ jobs:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      # 3️⃣ Debug: confirm the runner assumed the role
+      # 3️⃣ Debug: confirm the runner assumed the role correctly
       - name: Debug AWS credentials
         run: |
           echo "Caller identity:"
@@ -43,8 +43,8 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig (EKS Auto Mode)
-      - name: Generate kubeconfig
+      # 6️⃣ Generate kubeconfig explicitly using the OIDC role
+      - name: Generate kubeconfig (EKS Auto Mode)
         run: |
           rm -f ~/.kube/config
           aws eks update-kubeconfig \
@@ -52,8 +52,8 @@ jobs:
             --region eu-west-2 \
             --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           echo "Kubeconfig generated successfully."
-          kubectl version         # sanity check
-          kubectl get nodes        # confirm access
+          kubectl version --short
+          kubectl get nodes
         env:
           AWS_DEFAULT_REGION: eu-west-2
 
@@ -66,7 +66,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: eu-west-2
 
-      # 8️⃣ Optional: Verify deployment
+      # 8️⃣ Verify deployment
       - name: Verify Deployment
         run: |
           kubectl get pods
