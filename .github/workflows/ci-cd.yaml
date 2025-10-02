@@ -52,7 +52,6 @@ jobs:
             --region eu-west-2 \
             --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           echo "Kubeconfig generated successfully."
-          kubectl version --short
           kubectl get nodes
         env:
           AWS_DEFAULT_REGION: eu-west-2
