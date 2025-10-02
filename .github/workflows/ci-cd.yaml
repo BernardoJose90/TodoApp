@@ -24,7 +24,7 @@ jobs:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      # 3️⃣ Debug: confirm the runner assumed the role correctly
+      # 3️⃣ Debug AWS credentials
       - name: Debug AWS credentials
         run: |
           echo "Caller identity:"
@@ -43,15 +43,20 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig explicitly using the OIDC role
-      - name: Generate kubeconfig (EKS Auto Mode)
+      # 6️⃣ Generate kubeconfig (EKS Auto Mode)
+      - name: Generate kubeconfig
         run: |
           rm -f ~/.kube/config
-          aws eks update-kubeconfig \
-            --name Todo-list-App-cluster \
-            --region eu-west-2 
+          aws eks update-kubeconfig --name Todo-list-App-cluster --region eu-west-2
           echo "Kubeconfig generated successfully."
-          kubectl get nodes
+        env:
+          AWS_DEFAULT_REGION: eu-west-2
+
+      # 6️⃣a Authorization check: validate permissions
+      - name: Validate kubeconfig permissions
+        run: |
+          echo "Checking if we can get nodes:"
+          kubectl auth can-i get nodes
         env:
           AWS_DEFAULT_REGION: eu-west-2
 
@@ -64,7 +69,7 @@ jobs:
         env:
           AWS_DEFAULT_REGION: eu-west-2
 
-      # 8️⃣ Verify deployment
+      # 8️⃣ Verify Deployment
       - name: Verify Deployment
         run: |
           kubectl get pods
