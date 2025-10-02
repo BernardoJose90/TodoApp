@@ -23,6 +23,12 @@ jobs:
         role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
         aws-region: eu-west-2
 
+    # Optional: Debug OIDC token (for troubleshooting)
+    - name: Debug OIDC token
+      run: |
+        echo "OIDC token request URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+        echo "OIDC token request token: $ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+
 
     # 3️⃣ Login to Amazon ECR
     - name: Login to Amazon ECR
