@@ -33,6 +33,16 @@ jobs:
 
       - name: Deploy to EKS
         run: |
-          aws eks update-kubeconfig --name Todo-list-App-cluster --region eu-west-2
+          # Generate kubeconfig dynamically using the OIDC-assumed role
+          aws eks update-kubeconfig \
+            --name Todo-list-App-cluster \
+            --region eu-west-2 \
+            --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+
+          # Deploy the new image
+          IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
+
+          # Wait for rollout to complete
           kubectl rollout status deployment/todo-app-deployment
+
