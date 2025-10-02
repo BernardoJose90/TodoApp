@@ -1,57 +1,38 @@
-# GitHub Actions CI/CD Pipeline for Dockerized Application Deployment to AWS EKS
-# Builds your Docker image, pushes it to private ECR repo, and deploys it to EKS
-# Uses GitHub OIDC + IAM Role (no AWS secrets required)
-
 name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main ]
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    # 1️⃣ Checkout repository
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    # 2️⃣ Configure AWS using OIDC
-    - name: Configure AWS using OIDC
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
-        aws-region: eu-west-2
+      - name: Configure AWS using OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+          aws-region: eu-west-2
 
-    # Optional: Debug OIDC token (troubleshooting)
-    - name: Debug OIDC token
-      run: |
-        echo "OIDC token request URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
-        echo "OIDC token request token: $ACTIONS_ID_TOKEN_REQUEST_TOKEN"
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region eu-west-2 \
+          | docker login --username AWS --password-stdin 851725622142.dkr.ecr.eu-west-2.amazonaws.com
 
+      - name: Build and Push Docker Image
+        run: |
+          IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
+          docker build -t $IMAGE_REPO:latest .
+          docker push $IMAGE_REPO:latest
 
-    # 3️⃣ Login to Amazon ECR
-    - name: Login to Amazon ECR
-      run: |
-        aws ecr get-login-password --region eu-west-2 \
-        | docker login --username AWS --password-stdin 851725622142.dkr.ecr.eu-west-2.amazonaws.com
-
-    # 4️⃣ Build and push Docker image
-    - name: Build and Push Docker Image
-      run: |
-        IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
-        docker build -t $IMAGE_REPO:latest .
-        docker push $IMAGE_REPO:latest
-
-    # 5️⃣ Deploy to EKS
-    - name: Deploy to EKS
-      run: |
-        # Generate kubeconfig dynamically using IAM role
-        aws eks update-kubeconfig --name Todo-list-App-cluster --region eu-west-2
-
-        # Update deployment image
-        IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
-        kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
-
-        # Wait for rollout to complete
-        kubectl rollout status deployment/todo-app-deployment
+      - name: Deploy to EKS
+        run: |
+          aws eks update-kubeconfig --name Todo-list-App-cluster --region eu-west-2
+          kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
+          kubectl rollout status deployment/todo-app-deployment
