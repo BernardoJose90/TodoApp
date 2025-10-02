@@ -31,7 +31,7 @@ class Task(Base):
     status = Column(Enum("Todo", "In Progress", "Done"), default="Todo", nullable=False)
     priority = Column(Enum("Low", "Medium", "High"), default="Medium", nullable=False)
     due_date = Column(Date, nullable=True)
-    position = Column(Integer, nullable=True)  # For drag-and-drop ordering
+    position = Column(Integer, nullable=True)  # For drag-and-drop ordering.
 
 # Create tables if they don't exist
 Base.metadata.create_all(bind=engine)
