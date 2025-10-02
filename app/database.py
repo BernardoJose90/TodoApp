@@ -20,7 +20,7 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 # Declare ORM base
 Base = declarative_base()
 
-# ===========================
+# ==========================
 # Define Task model
 # ==========================
 class Task(Base):
