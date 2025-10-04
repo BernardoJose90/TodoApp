@@ -45,7 +45,6 @@ jobs:
       - name: Generate kubeconfig
         run: |
           rm -f ~/.kube/config
-          unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
           
           aws eks update-kubeconfig \
             --name Todo-list-App-cluster \
