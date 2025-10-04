@@ -17,14 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2️⃣ Configure AWS OIDC credentials
+      # 2️⃣ Configure AWS OIDC credentials (assume the role)
       - name: Configure AWS OIDC credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      # 3️⃣ Debug caller identity (OIDC)
+      # 3️⃣ Debug caller identity
       - name: Debug AWS credentials
         run: aws sts get-caller-identity
 
@@ -41,7 +41,7 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig (no --role, use alias)
+      # 6️⃣ Generate kubeconfig using the assumed role (no --role here)
       - name: Generate kubeconfig
         run: |
           rm -f ~/.kube/config
@@ -51,11 +51,11 @@ jobs:
             --alias github-actions
           echo "Kubeconfig generated successfully."
 
-      # 7️⃣ Authorization check
+      # 7️⃣ Check permissions
       - name: Validate kubeconfig permissions
         run: kubectl auth can-i get pods
 
-      # 8️⃣ Deploy Docker image to EKS
+      # 8️⃣ Deploy Docker image
       - name: Deploy to EKS
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
