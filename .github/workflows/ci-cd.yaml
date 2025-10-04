@@ -41,23 +41,19 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig with correct username
+      # 6️⃣ Generate kubeconfig (no --role, use alias)
       - name: Generate kubeconfig
         run: |
           rm -f ~/.kube/config
           aws eks update-kubeconfig \
             --name Todo-list-App-cluster \
             --region eu-west-2 \
-            --alias github-actions \
-            --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+            --alias github-actions
           echo "Kubeconfig generated successfully."
 
-
-      # 7️⃣ Validate kubeconfig permissions
-      - name: Validate kubeconfig
-        run: |
-          kubectl config view --minify
-          kubectl auth can-i get pods
+      # 7️⃣ Authorization check
+      - name: Validate kubeconfig permissions
+        run: kubectl auth can-i get pods
 
       # 8️⃣ Deploy Docker image to EKS
       - name: Deploy to EKS
