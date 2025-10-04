@@ -56,7 +56,7 @@ jobs:
           kubectl config view --minify
           kubectl auth can-i get pods
 
-      # 8️⃣ Deploy Docker image to EKS
+      # 8️⃣ Deploy Docker image to EKS.
       - name: Deploy to EKS
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
