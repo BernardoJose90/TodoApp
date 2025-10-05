@@ -1,50 +1,44 @@
-name: Debug EKS Access
-
-on:
-  push:
-    branches: [debug-eks]  # Create a temporary branch
-
+name: Debug Token Authentication
+on: workflow_dispatch
 permissions:
   id-token: write
   contents: read
-
 jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Configure AWS OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      - name: Debug AWS Identity
+      - name: Debug Token
         run: |
-          echo "🔍 AWS Identity in GitHub Actions:"
-          aws sts get-caller-identity
-          echo ""
-
-      - name: Setup kubectl
-        run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-      - name: Test EKS Token
-        run: |
-          echo "🔍 Testing EKS token generation..."
-          aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json | head -c 200
-          echo "..."
-          echo ""
-
-      - name: Configure EKS Access
-        run: |
-          aws eks update-kubeconfig --region eu-west-2 --name Todo-list-App-cluster
-          echo "Kubeconfig created"
-
-      - name: Test kubectl
-        run: |
-          echo "🔐 Testing kubectl access..."
-          kubectl get nodes --v=6
+          echo "🔍 Debugging EKS token..."
+          
+          # Generate token
+          TOKEN_JSON=$(aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json)
+          TOKEN=$(echo "$TOKEN_JSON" | jq -r '.status.token')
+          
+          echo "Token length: ${#TOKEN}"
+          echo "Token preview: ${TOKEN:0:100}..."
+          
+          # Decode the token to see what's inside
+          echo "🔍 Decoding token payload..."
+          PAYLOAD=$(echo "$TOKEN" | cut -d'.' -f2 | base64 -d 2>/dev/null | jq . 2>/dev/null || echo "Cannot decode token")
+          echo "Token payload: $PAYLOAD"
+          
+          # Get cluster endpoint
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
+          
+          echo "🔍 Testing direct API call with token..."
+          curl -H "Authorization: Bearer $TOKEN" \
+               "$CLUSTER_ENDPOINT/api/v1/nodes" \
+               --insecure \
+               -v \
+               -w "\nHTTP Status: %{http_code}\n" \
+               -o /tmp/response.txt
+          
+          echo "🔍 API Response:"
+          cat /tmp/response.txt
