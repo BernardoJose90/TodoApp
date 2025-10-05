@@ -13,7 +13,7 @@ else:
 secret = get_secret()
 db_url = f"mysql+pymysql://{secret['username']}:{secret['password']}@{secret['host']}:3306/{secret['dbname']}"
 
-# Create engine and session factory
+# Create engine and session factory,
 engine = create_engine(db_url, echo=True)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
