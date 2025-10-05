@@ -1,4 +1,4 @@
-name: Deploy to EKS
+name: CI/CD Pipeline with Debug
 
 on:
   push:
@@ -6,93 +6,136 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com
-  ECR_REPOSITORY: webserver/todoapp
   EKS_CLUSTER_NAME: TodoApp-Production
-  IMAGE_TAG: latest
+  ECR_REPOSITORY: webserver/todoapp
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS OIDC
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+          aws-region: ${{ env.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      run: |
-        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - name: Setup kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-    - name: Build, tag, and push image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+      - name: Configure EKS access
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-    - name: Update kubeconfig for EKS
-      run: |
-        aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+      - name: Verify EKS access
+        run: |
+          kubectl get nodes
+          echo "✅ EKS access verified!"
 
-    - name: Verify EKS access
-      run: |
-        kubectl get nodes
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+          docker login --username AWS --password-stdin 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-    - name: Fix IAM permissions for Secrets Manager
-      run: |
-        # Add Secrets Manager access to the node role
-        aws iam attach-role-policy \
-          --role-name eksctl-TodoApp-Production-nodegrou-NodeInstanceRole-ME7jWEW3uNJM \
-          --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
-        echo "✅ Added Secrets Manager permissions to node role"
+      - name: Build and push Docker image
+        run: |
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+          docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
-    - name: Deploy to EKS
-      env:
-        IMAGE_URL: ${{ steps.build-image.outputs.IMAGE_URL }}
-      run: |
-        echo "🚀 Deploying Todo App to EKS..."
-        
-        # Update the deployment with the new image
-        kubectl set image deployment/todo-app-deployment todo-app=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        
-        # Wait for rollout to complete
-        kubectl rollout status deployment/todo-app-deployment --timeout=300s
-        
-        echo "✅ Deployment completed successfully!"
+      - name: Fix IAM permissions for Secrets Manager
+        run: |
+          echo "🔧 Adding Secrets Manager permissions to node role..."
+          aws iam attach-role-policy \
+            --role-name eksctl-TodoApp-Production-nodegrou-NodeInstanceRole-ME7jWEW3uNJM \
+            --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
+          echo "✅ Added Secrets Manager permissions to node role"
 
-    - name: Verify deployment
-      run: |
-        echo "🔍 Checking deployment status..."
-        kubectl get deployments
-        kubectl get pods
-        
-        echo "📋 Checking application logs..."
-        kubectl logs deployment/todo-app-deployment
-        
-        echo "🌐 Checking service status..."
-        kubectl get services
+      - name: Debug current deployment
+        run: |
+          echo "🔍 Checking current deployment status..."
+          kubectl get deployments
+          kubectl get pods -l app=todo-app
+          kubectl describe deployment todo-app-deployment || echo "Deployment might not exist yet"
 
-    - name: Health check
-      run: |
-        echo "🏥 Performing health check..."
-        # Get the pod name
-        POD_NAME=$(kubectl get pods -l app=todo-app -o jsonpath='{.items[0].metadata.name}')
-        
-        # Check if the pod is running
-        kubectl get pod $POD_NAME
-        
-        # Check application health
-        kubectl exec $POD_NAME -- curl -s http://localhost:5000/health || echo "Health endpoint not available yet"
-        
-        echo "✅ Health check completed"
+      - name: Deploy to EKS
+        run: |
+          IMAGE_URL=851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          
+          echo "🚀 Deploying Todo App to EKS..."
+          
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: todo-app-deployment
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: todo-app
+            template:
+              metadata:
+                labels:
+                  app: todo-app
+              spec:
+                containers:
+                - name: todo-app
+                  image: $IMAGE_URL
+                  ports:
+                  - containerPort: 5000
+                  env:
+                  - name: ENV
+                    value: "AWS"
+                  - name: FLASK_APP
+                    value: "main.py"
+                  - name: FLASK_RUN_HOST
+                    value: "0.0.0.0"
+                  - name: PYTHONPATH
+                    value: "/app"
+                  command: ["/bin/sh"]
+                  args: ["-c", "python -c 'import app; print(\"App imports successful\")' && flask run"]
+          EOF
+
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting for deployment to be ready..."
+          kubectl rollout status deployment/todo-app-deployment --timeout=300s
+          echo "✅ Deployment is ready!"
+
+      - name: Check application status
+        run: |
+          echo "🔍 Checking application status..."
+          sleep 10
+          kubectl get pods -l app=todo-app -o wide
+          kubectl get deployment todo-app-deployment
+
+      - name: Check application logs
+        run: |
+          echo "📋 Checking application logs..."
+          kubectl logs -l app=todo-app --tail=100
+
+      - name: Create service if not exists
+        run: |
+          kubectl apply -f - <<EOF || echo "Service may already exist"
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: todo-app-service
+          spec:
+            type: LoadBalancer
+            selector:
+              app: todo-app
+            ports:
+            - protocol: TCP
+              port: 80
+              targetPort: 5000
+          EOF
