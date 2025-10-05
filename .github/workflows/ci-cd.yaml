@@ -38,7 +38,7 @@ jobs:
       - name: Verify EKS access
         run: |
           kubectl get nodes
-          echo "✅ EKS access verified!"
+          echo "✅ EKS access working!"
 
       - name: Login to ECR
         run: |
@@ -78,10 +78,6 @@ jobs:
                   env:
                   - name: ENV
                     value: "AWS"
-                  - name: FLASK_APP
-                    value: "main.py"
-                  - name: FLASK_RUN_HOST
-                    value: "0.0.0.0"
           EOF
 
           kubectl apply -f - <<EOF
