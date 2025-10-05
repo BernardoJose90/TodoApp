@@ -37,33 +37,50 @@ jobs:
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      # 5️⃣ Configure kubeconfig
-      - name: Configure kubeconfig for EKS
+      # 5️⃣ Get EKS cluster details
+      - name: Get EKS cluster info
+        id: eks-info
         run: |
-          aws eks update-kubeconfig \
-            --region eu-west-2 \
-            --name Todo-list-App-cluster
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
+          CA_DATA=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.certificateAuthority.data" --output text)
+          echo "cluster_endpoint=$CLUSTER_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "ca_data=$CA_DATA" >> $GITHUB_OUTPUT
+          echo "✅ EKS cluster info retrieved"
 
-      # 6️⃣ Map IAM role to EKS (CRITICAL FIX)
-      - name: Map IAM role to EKS cluster
+      # 6️⃣ Create kubeconfig manually with proper authentication
+      - name: Create kubeconfig manually
         run: |
-          echo "🔧 Mapping IAM role to EKS RBAC..."
-          
-          # Create or update the aws-auth configmap
-          kubectl apply -f - <<EOF
+          mkdir -p ~/.kube
+          cat > ~/.kube/config << EOF
           apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: aws-auth
-            namespace: kube-system
-          data:
-            mapRoles: |
-              - rolearn: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
-                username: github-actions
-                groups:
-                  - system:masters
+          kind: Config
+          clusters:
+          - name: todo-app-cluster
+            cluster:
+              server: ${{ steps.eks-info.outputs.cluster_endpoint }}
+              certificate-authority-data: ${{ steps.eks-info.outputs.ca_data }}
+          contexts:
+          - name: todo-app-context
+            context:
+              cluster: todo-app-cluster
+              user: github-actions-user
+          current-context: todo-app-context
+          users:
+          - name: github-actions-user
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                - --region
+                - eu-west-2
+                - eks
+                - get-token
+                - --cluster-name
+                - Todo-list-App-cluster
+                # Remove --role-arn since we're already assuming the role via OIDC
           EOF
-          echo "✅ IAM role mapped to EKS cluster"
+          echo "✅ Kubeconfig created manually"
 
       # 7️⃣ Verify cluster access
       - name: Verify cluster access
