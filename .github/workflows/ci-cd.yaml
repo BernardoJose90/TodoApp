@@ -1,7 +1,8 @@
-name: Debug EKS Access - Comprehensive
+name: Debug EKS Access
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [debug-eks]  # Create a temporary branch
 
 permissions:
   id-token: write
@@ -20,26 +21,10 @@ jobs:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      - name: Debug Environment
-        run: |
-          echo "🔍 GitHub Context:"
-          echo "Event: ${{ github.event_name }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "SHA: ${{ github.sha }}"
-          echo ""
-
       - name: Debug AWS Identity
         run: |
-          echo "🔍 AWS Identity Details:"
+          echo "🔍 AWS Identity in GitHub Actions:"
           aws sts get-caller-identity
-          echo ""
-
-          echo "🔍 Testing role assumption:"
-          aws sts assume-role \
-            --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role \
-            --role-session-name TestSession \
-            --duration-seconds 900 \
-            --query "AssumedRoleUser.Arn"
           echo ""
 
       - name: Setup kubectl
@@ -47,85 +32,19 @@ jobs:
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Test EKS Cluster Access
+      - name: Test EKS Token
         run: |
-          echo "🔍 EKS Cluster Status:"
-          aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.status"
+          echo "🔍 Testing EKS token generation..."
+          aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json | head -c 200
+          echo "..."
           echo ""
 
-      - name: Test EKS Token Generation
+      - name: Configure EKS Access
         run: |
-          echo "🔍 Testing EKS token generation:"
-          timeout 30s aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json || echo "❌ Token generation timed out or failed"
-          echo ""
+          aws eks update-kubeconfig --region eu-west-2 --name Todo-list-App-cluster
+          echo "Kubeconfig created"
 
-      - name: Manual Kubeconfig Setup
+      - name: Test kubectl
         run: |
-          echo "🔧 Setting up kubeconfig manually..."
-          
-          # Get cluster details
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
-          CA_DATA=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.certificateAuthority.data" --output text)
-          
-          echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
-          echo "CA Data length: ${#CA_DATA}"
-          
-          # Create manual kubeconfig
-          mkdir -p ~/.kube
-          cat > ~/.kube/config << EOF
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - cluster:
-              certificate-authority-data: $CA_DATA
-              server: $CLUSTER_ENDPOINT
-            name: todo-app-cluster
-          contexts:
-          - context:
-              cluster: todo-app-cluster
-              user: github-actions
-            name: todo-app-context
-          current-context: todo-app-context
-          users:
-          - name: github-actions
-            user:
-              exec:
-                apiVersion: client.authentication.k8s.io/v1beta1
-                command: aws
-                args:
-                - eks
-                - get-token
-                - --cluster-name
-                - Todo-list-App-cluster
-                - --region
-                - eu-west-2
-                - --output
-                - json
-          EOF
-          
-          echo "✅ Manual kubeconfig created"
-          cat ~/.kube/config
-
-      - name: Test kubectl with different methods
-        run: |
-          echo "🔐 Method 1: Standard kubectl"
-          kubectl get nodes --request-timeout=30s || echo "❌ Method 1 failed"
-          echo ""
-          
-          echo "🔐 Method 2: With verbose logging"
-          kubectl get nodes --v=6 --request-timeout=30s || echo "❌ Method 2 failed"
-          echo ""
-          
-          echo "🔐 Method 3: Direct API call"
-          TOKEN=$(aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json | jq -r '.status.token')
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
-          
-          echo "Making direct API call to: $CLUSTER_ENDPOINT"
-          curl -H "Authorization: Bearer $TOKEN" \
-               -H "Content-Type: application/json" \
-               "$CLUSTER_ENDPOINT/api/v1/nodes" \
-               --connect-timeout 20 \
-               --max-time 30 \
-               --insecure \
-               -w "\nHTTP Status: %{http_code}\n" \
-               -v || echo "❌ Direct API call failed"
+          echo "🔐 Testing kubectl access..."
+          kubectl get nodes --v=6
