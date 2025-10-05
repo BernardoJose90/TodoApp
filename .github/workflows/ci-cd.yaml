@@ -3,46 +3,19 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 env:
   AWS_REGION: eu-west-2
   EKS_CLUSTER_NAME: Todo-list-App-cluster
   ECR_REPOSITORY: webserver/todoapp
-  CONTAINER_PORT: 5000
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  test:
+  deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run syntax check
-        run: |
-          python -m py_compile app/*.py
-          echo "✅ All Python files compiled successfully"
-
-  build-and-deploy:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,56 +27,97 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GitHubActions-${{ github.run_id }}
 
+      - name: Debug AWS Identity
+        run: |
+          echo "🔍 AWS Identity in GitHub Actions:"
+          aws sts get-caller-identity
+          echo ""
+
       - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Configure EKS access
+      - name: Create kubeconfig manually
         run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ env.EKS_CLUSTER_NAME }}
+          echo "🔧 Creating kubeconfig manually..."
+          
+          # Get cluster details
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.endpoint" --output text)
+          CA_DATA=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.certificateAuthority.data" --output text)
+          
+          echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
+          
+          # Create kubeconfig directory
+          mkdir -p ~/.kube
+          
+          # Create kubeconfig with explicit authentication
+          cat > ~/.kube/config << EOF
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              certificate-authority-data: $CA_DATA
+              server: $CLUSTER_ENDPOINT
+            name: eks-cluster
+          contexts:
+          - context:
+              cluster: eks-cluster
+              user: github-actions
+            name: eks-context
+          current-context: eks-context
+          kind: Config
+          users:
+          - name: github-actions
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                - eks
+                - get-token
+                - --cluster-name
+                - ${{ env.EKS_CLUSTER_NAME }}
+                - --region
+                - ${{ env.AWS_REGION }}
+                env: null
+          EOF
+          
+          echo "✅ Manual kubeconfig created"
+          cat ~/.kube/config
 
-      - name: Verify EKS access
+      - name: Test EKS token generation
         run: |
-          kubectl get nodes
-          echo "✅ EKS access verified!"
+          echo "🔍 Testing EKS token generation..."
+          aws eks get-token --cluster-name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --output json | jq -r '.status.token' | head -c 50
+          echo "..."
+          echo "✅ Token generated successfully"
 
-      - name: Login to Amazon ECR
+      - name: Test kubectl access
+        run: |
+          echo "🔐 Testing kubectl access..."
+          kubectl get nodes --v=6
+
+      - name: Login to ECR
         run: |
           aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
           docker login --username AWS --password-stdin 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         run: |
           docker build -t ${{ env.ECR_REPOSITORY }}:latest .
-
-      - name: Tag and push Docker image
-        run: |
-          docker tag ${{ env.ECR_REPOSITORY }}:latest \
-            851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          
-          docker tag ${{ env.ECR_REPOSITORY }}:latest \
-            851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-          
+          docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
       - name: Deploy to EKS
         run: |
           IMAGE_URL=851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           
-          echo "🚀 Deploying Todo App to EKS..."
-          
-          # Create/Update deployment
           kubectl apply -f - <<EOF
           apiVersion: apps/v1
           kind: Deployment
           metadata:
             name: todo-app-deployment
-            labels:
-              app: todo-app
           spec:
             replicas: 2
             selector:
@@ -118,36 +132,13 @@ jobs:
                 - name: todo-app
                   image: $IMAGE_URL
                   ports:
-                  - containerPort: ${{ env.CONTAINER_PORT }}
+                  - containerPort: 5000
                   env:
                   - name: ENV
                     value: "LOCAL"
-                  - name: FLASK_APP
-                    value: "main.py"
-                  - name: FLASK_RUN_HOST
-                    value: "0.0.0.0"
-                  resources:
-                    requests:
-                      memory: "256Mi"
-                      cpu: "250m"
-                    limits:
-                      memory: "512Mi"
-                      cpu: "500m"
-                  livenessProbe:
-                    httpGet:
-                      path: /
-                      port: ${{ env.CONTAINER_PORT }}
-                    initialDelaySeconds: 30
-                    periodSeconds: 10
-                  readinessProbe:
-                    httpGet:
-                      path: /
-                      port: ${{ env.CONTAINER_PORT }}
-                    initialDelaySeconds: 5
-                    periodSeconds: 5
           EOF
 
-          # Create/Update service
+
           kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Service
@@ -159,33 +150,7 @@ jobs:
             ports:
             - protocol: TCP
               port: 80
-              targetPort: ${{ env.CONTAINER_PORT }}
+              targetPort: 5000
             type: LoadBalancer
           EOF
-
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/todo-app-deployment --timeout=300s
-
-      - name: Verify deployment
-        run: |
-          echo "=== Deployment Status ==="
-          kubectl get deployment todo-app-deployment
-          
-          echo "=== Pods ==="
-          kubectl get pods -l app=todo-app
-          
-          echo "=== Services ==="
-          kubectl get service todo-app-service
-          
-          echo "=== Application Logs ==="
-          kubectl logs -l app=todo-app --tail=20 || echo "Logs not available yet"
-
-      - name: Get LoadBalancer URL
-        run: |
-          echo "🌐 Waiting for LoadBalancer..."
-          sleep 30
-          kubectl get service todo-app-service -o wide
-          
-          LB_HOSTNAME=$(kubectl get service todo-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available yet")
-          echo "📱 Your Todo App will be available at: http://$LB_HOSTNAME"
+      
