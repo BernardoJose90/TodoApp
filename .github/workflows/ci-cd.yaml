@@ -115,7 +115,7 @@ jobs:
 
       - name: Get LoadBalancer URL
         run: |
-          echo "🌐 Getting LoadBalancer information...."
+          echo "🌐 Getting LoadBalancer information..."
           sleep 30
           kubectl get service todo-app-service -o wide
           
