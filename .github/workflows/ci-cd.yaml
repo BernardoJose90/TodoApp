@@ -22,7 +22,7 @@ jobs:
 
       - name: Debug Environment
         run: |
-          echo " GitHub Context:"
+          echo "🔍 GitHub Context:"
           echo "Event: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
           echo "SHA: ${{ github.sha }}"
@@ -128,4 +128,4 @@ jobs:
                --max-time 30 \
                --insecure \
                -w "\nHTTP Status: %{http_code}\n" \
-               -v || echo "❌❌ Direct API call failed"
+               -v || echo "❌ Direct API call failed"
