@@ -113,6 +113,22 @@ jobs:
           kubectl rollout status deployment/todo-app-deployment --timeout=300s
           kubectl get pods,services
 
+      - name: Debug application issues
+        run: |
+          echo "🔍 Debugging application..."
+          
+          # Check pod status
+          kubectl get pods -l app=todo-app -o wide
+          
+          # Check pod events
+          kubectl describe pods -l app=todo-app
+          
+          # Check application logs
+          kubectl logs -l app=todo-app --tail=100
+          
+          # Check if pods can reach database
+          kubectl exec -it $(kubectl get pods -l app=todo-app -o jsonpath='{.items[0].metadata.name}') -- python -c "import app.database; print('Database import successful')" || echo "Database import failed"
+
       - name: Get LoadBalancer URL
         run: |
           echo "🌐 Getting LoadBalancer information..."
