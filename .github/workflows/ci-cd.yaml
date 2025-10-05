@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - Manual Auth
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  EKS_CLUSTER_NAME: Todo-list-App-cluster
+  EKS_CLUSTER_NAME: TodoApp-Production  # ← New cluster name
   ECR_REPOSITORY: webserver/todoapp
 
 permissions:
@@ -31,46 +31,12 @@ jobs:
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Manual EKS Authentication
+      - name: Configure EKS access
         run: |
-          echo "🔧 Setting up manual EKS authentication..."
-          
-          # Get EKS cluster details
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.endpoint" --output text)
-          CA_DATA=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.certificateAuthority.data" --output text)
-          
-          # Generate long-lived token (valid for 15 minutes)
-          TOKEN=$(aws eks get-token --cluster-name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --output json | jq -r '.status.token')
-          
-          echo "Token generated successfully (length: ${#TOKEN})"
-          
-          # Create kubeconfig with static token
-          mkdir -p ~/.kube
-          cat > ~/.kube/config << EOF
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - cluster:
-              certificate-authority-data: $CA_DATA
-              server: $CLUSTER_ENDPOINT
-            name: eks-cluster
-          contexts:
-          - context:
-              cluster: eks-cluster
-              user: github-actions
-            name: eks-context
-          current-context: eks-context
-          users:
-          - name: github-actions
-            user:
-              token: $TOKEN
-          EOF
-          
-          echo "✅ Manual kubeconfig created"
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
       - name: Verify EKS access
         run: |
-          echo "🔐 Testing EKS access..."
           kubectl get nodes
           echo "✅ EKS access verified!"
 
@@ -91,7 +57,6 @@ jobs:
           
           echo "🚀 Deploying Todo App to EKS..."
           
-          # Create/Update deployment
           kubectl apply -f - <<EOF
           apiVersion: apps/v1
           kind: Deployment
@@ -128,7 +93,6 @@ jobs:
                       cpu: "500m"
           EOF
 
-          # Create/Update service
           kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Service
@@ -144,29 +108,8 @@ jobs:
             type: LoadBalancer
           EOF
 
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/todo-app-deployment --timeout=300s
-
       - name: Verify deployment
         run: |
-          echo "=== Deployment Status ==="
-          kubectl get deployment todo-app-deployment
-          
-          echo "=== Pods ==="
-          kubectl get pods -l app=todo-app
-          
-          echo "=== Services ==="
-          kubectl get service todo-app-service
-          
-          echo "=== Application Logs ==="
-          kubectl logs -l app=todo-app --tail=20 || echo "Logs not available yet"
-
-      - name: Get LoadBalancer URL
-        run: |
-          echo "🌐 Getting LoadBalancer information..."
-          sleep 30
-          kubectl get service todo-app-service -o wide
-          
-          LB_HOSTNAME=$(kubectl get service todo-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available yet")
-          echo "📱 Your Todo App will be available at: http://$LB_HOSTNAME"
+          kubectl rollout status deployment/todo-app-deployment --timeout=300s
+          kubectl get pods,services
+        
