@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  EKS_CLUSTER_NAME: TodoApp-Production  # ← New cluster name
+  EKS_CLUSTER_NAME: TodoApp-Production  # ← Updated to new cluster
   ECR_REPOSITORY: webserver/todoapp
 
 permissions:
@@ -112,4 +112,12 @@ jobs:
         run: |
           kubectl rollout status deployment/todo-app-deployment --timeout=300s
           kubectl get pods,services
-        
+
+      - name: Get LoadBalancer URL
+        run: |
+          echo "🌐 Getting LoadBalancer information..."
+          sleep 30
+          kubectl get service todo-app-service -o wide
+          
+          LB_HOSTNAME=$(kubectl get service todo-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available yet")
+          echo "📱 Your Todo App will be available at: http://$LB_HOSTNAME"
