@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Debug
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  EKS_CLUSTER_NAME: TodoApp-Production  # ← Updated to new cluster
+  EKS_CLUSTER_NAME: TodoApp-Production
   ECR_REPOSITORY: webserver/todoapp
 
 permissions:
@@ -51,6 +51,13 @@ jobs:
           docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
+      - name: Debug current deployment
+        run: |
+          echo "🔍 Checking current deployment status..."
+          kubectl get deployments
+          kubectl get pods -l app=todo-app
+          kubectl describe deployment todo-app-deployment
+
       - name: Deploy to EKS
         run: |
           IMAGE_URL=851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
@@ -63,7 +70,7 @@ jobs:
           metadata:
             name: todo-app-deployment
           spec:
-            replicas: 2
+            replicas: 1  # Start with 1 replica for debugging
             selector:
               matchLabels:
                 app: todo-app
@@ -84,56 +91,15 @@ jobs:
                     value: "main.py"
                   - name: FLASK_RUN_HOST
                     value: "0.0.0.0"
-                  resources:
-                    requests:
-                      memory: "256Mi"
-                      cpu: "250m"
-                    limits:
-                      memory: "512Mi"
-                      cpu: "500m"
+                  - name: PYTHONPATH
+                    value: "/app"
+                  command: ["/bin/sh"]
+                  args: ["-c", "python -c 'import app; print(\"App imports successful\")' && flask run"]
           EOF
 
-          kubectl apply -f - <<EOF
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: todo-app-service
-          spec:
-            selector:
-              app: todo-app
-            ports:
-            - protocol: TCP
-              port: 80
-              targetPort: 5000
-            type: LoadBalancer
-          EOF
-
-      - name: Verify deployment
+      - name: Check application logs
         run: |
-          kubectl rollout status deployment/todo-app-deployment --timeout=300s
-          kubectl get pods,services
-
-      - name: Debug application issues
-        run: |
-          echo "🔍 Debugging application..."
-          
-          # Check pod status
-          kubectl get pods -l app=todo-app -o wide
-          
-          # Check pod events
-          kubectl describe pods -l app=todo-app
-          
-          # Check application logs
-          kubectl logs -l app=todo-app --tail=100
-          
-          # Check if pods can reach database
-          kubectl exec -it $(kubectl get pods -l app=todo-app -o jsonpath='{.items[0].metadata.name}') -- python -c "import app.database; print('Database import successful')" || echo "Database import failed"
-
-      - name: Get LoadBalancer URL
-        run: |
-          echo "🌐 Getting LoadBalancer information..."
+          echo "🔍 Checking application logs..."
           sleep 30
-          kubectl get service todo-app-service -o wide
-          
-          LB_HOSTNAME=$(kubectl get service todo-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available yet")
-          echo "📱 Your Todo App will be available at: http://$LB_HOSTNAME"
+          kubectl get pods -l app=todo-app
+          kubectl logs -l app=todo-app --tail=100

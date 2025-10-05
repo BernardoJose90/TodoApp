@@ -1,5 +1,6 @@
 from flask import render_template, request, jsonify
-from ap import app
+# ✅ CORRECT - This matches your __init__.py
+from app import app
 from app import database as db_helper
 
 @app.route("/")
