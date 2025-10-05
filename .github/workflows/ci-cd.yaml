@@ -1,20 +1,10 @@
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [ main ]
-
-env:
-  AWS_REGION: eu-west-2
-  EKS_CLUSTER_NAME: Todo-list-App-cluster
-  ECR_REPOSITORY: webserver/todoapp
-
+name: Debug OIDC Authentication
+on: workflow_dispatch
 permissions:
   id-token: write
   contents: read
-
 jobs:
-  deploy:
+  debug:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -24,78 +14,78 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: eu-west-2
+
+      - name: Wait for OIDC propagation
+        run: |
+          echo "⏳ Waiting 30 seconds for OIDC provider propagation..."
+          sleep 30
+
+      - name: Debug AWS Identity
+        run: |
+          echo "🔍 AWS Identity:"
+          aws sts get-caller-identity
+          echo ""
 
       - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Configure EKS access
+      - name: Test EKS Token Generation
         run: |
-          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          echo "🔍 Testing EKS token generation..."
+          TOKEN_OUTPUT=$(aws eks get-token --cluster-name Todo-list-App-cluster --region eu-west-2 --output json 2>&1)
+          echo "Token generation: $TOKEN_OUTPUT"
+          echo ""
 
-      - name: Verify EKS access
+      - name: Manual Kubeconfig Setup
         run: |
-          kubectl get nodes
-          echo "✅ EKS access working!"
-
-      - name: Login to ECR
-        run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
-          docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-
-      - name: Deploy to EKS
-        run: |
-          IMAGE_URL=851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          echo "🔧 Setting up manual kubeconfig..."
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
+          CA_DATA=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.certificateAuthority.data" --output text)
           
-          kubectl apply -f - <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: todo-app-deployment
-          spec:
-            replicas: 2
-            selector:
-              matchLabels:
-                app: todo-app
-            template:
-              metadata:
-                labels:
-                  app: todo-app
-              spec:
-                containers:
-                - name: todo-app
-                  image: $IMAGE_URL
-                  ports:
-                  - containerPort: 5000
-                  env:
-                  - name: ENV
-                    value: "AWS"
-          EOF
-
-          kubectl apply -f - <<EOF
+          mkdir -p ~/.kube
+          cat > ~/.kube/config << EOF
           apiVersion: v1
-          kind: Service
-          metadata:
-            name: todo-app-service
-          spec:
-            selector:
-              app: todo-app
-            ports:
-            - protocol: TCP
-              port: 80
-              targetPort: 5000
-            type: LoadBalancer
+          kind: Config
+          clusters:
+          - cluster:
+              certificate-authority-data: $CA_DATA
+              server: $CLUSTER_ENDPOINT
+            name: eks-cluster
+          contexts:
+          - context:
+              cluster: eks-cluster
+              user: github-actions
+            name: eks-context
+          current-context: eks-context
+          kind: Config
+          users:
+          - name: github-actions
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                - eks
+                - get-token
+                - --cluster-name
+                - Todo-list-App-cluster
+                - --region
+                - eu-west-2
           EOF
 
-      - name: Verify deployment
+      - name: Test kubectl with retry
         run: |
-          kubectl rollout status deployment/todo-app-deployment
-          kubectl get pods,services
+          echo "🔐 Testing kubectl access with retry..."
+          for i in {1..3}; do
+            echo "Attempt $i..."
+            if kubectl get nodes --request-timeout=30s; then
+              echo "✅ Success on attempt $i"
+              break
+            else
+              echo "❌ Attempt $i failed"
+              sleep 10
+            fi
+          done
