@@ -36,53 +36,65 @@ jobs:
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-          kubectl version --client
 
-      # 5️⃣ Configure kubeconfig with proper authentication
+      # 5️⃣ Configure kubeconfig
       - name: Configure kubeconfig for EKS
         run: |
-          echo "🔧 Configuring kubeconfig for EKS cluster..."
           aws eks update-kubeconfig \
             --region eu-west-2 \
-            --name Todo-list-App-cluster \
-            --verbose
-          
-          echo "📋 Kubeconfig contents:"
-          cat ~/.kube/config
+            --name Todo-list-App-cluster
 
-      # 6️⃣ Verify cluster access
+      # 6️⃣ Map IAM role to EKS (CRITICAL FIX)
+      - name: Map IAM role to EKS cluster
+        run: |
+          echo "🔧 Mapping IAM role to EKS RBAC..."
+          
+          # Create or update the aws-auth configmap
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: aws-auth
+            namespace: kube-system
+          data:
+            mapRoles: |
+              - rolearn: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+                username: github-actions
+                groups:
+                  - system:masters
+          EOF
+          echo "✅ IAM role mapped to EKS cluster"
+
+      # 7️⃣ Verify cluster access
       - name: Verify cluster access
         run: |
           echo "🔐 Testing cluster access..."
           kubectl get nodes
           kubectl auth can-i get pods
 
-      # 7️⃣ Login to Amazon ECR
+      # 8️⃣ Login to Amazon ECR
       - name: Login to Amazon ECR
         run: |
           aws ecr get-login-password --region eu-west-2 \
             | docker login --username AWS --password-stdin 851725622142.dkr.ecr.eu-west-2.amazonaws.com
 
-      # 8️⃣ Build and push Docker image
+      # 9️⃣ Build and push Docker image
       - name: Build and push Docker image
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 9️⃣ Deploy to EKS
+      # 🔟 Deploy to EKS
       - name: Deploy to EKS
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           
-          # Apply deployment
           kubectl apply -f - <<EOF
           apiVersion: apps/v1
           kind: Deployment
           metadata:
             name: todo-app-deployment
-            labels:
-              app: todo-app
           spec:
             replicas: 2
             selector:
@@ -110,7 +122,6 @@ jobs:
                       cpu: "500m"
           EOF
 
-          # Apply service
           kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Service
@@ -126,12 +137,12 @@ jobs:
             type: LoadBalancer
           EOF
 
-      # 🔟 Wait for rollout
+      # 1️⃣1️⃣ Wait for rollout
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/todo-app-deployment --timeout=300s
 
-      # 🔍 Verify deployment
+      # 1️⃣2️⃣ Verify deployment
       - name: Verify Deployment
         run: |
           kubectl get pods,services,deployments
