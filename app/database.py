@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Enum, Date
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Dynamically choose which secrets module to use(LOCAL or AWS)
-if os.getenv("ENV") == "LOCAL":
+if os.getenv("ENV") == "AWS":
     from app.secrets import get_secret  # fetches from AWS Secrets Manager
 else:
     from app.secrets_local import get_secret  # local testing

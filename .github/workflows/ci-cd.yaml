@@ -15,7 +15,7 @@ jobs:
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # 2️⃣ Configure AWS OIDC credentials (assume the role)
       - name: Configure AWS OIDC credentials
@@ -41,31 +41,107 @@ jobs:
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 6️⃣ Generate kubeconfig using the assumed role (no --role here)
+      # 6️⃣ Generate kubeconfig using the assumed role
       - name: Generate kubeconfig
         run: |
-          rm -f ~/.kube/config
           aws eks update-kubeconfig \
             --name Todo-list-App-cluster \
-            --region eu-west-2 \
-            --alias github-actions
+            --region eu-west-2
           echo "Kubeconfig generated successfully."
 
       # 7️⃣ Check permissions
       - name: Validate kubeconfig permissions
-        run: kubectl auth can-i get pods
+        run: |
+          kubectl auth can-i get pods
+          kubectl get nodes
 
-      # 8️⃣ Deploy Docker image
+      # 8️⃣ Apply Kubernetes manifests
       - name: Deploy to EKS
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
-          kubectl set image deployment/todo-app-deployment todo-app=$IMAGE_REPO:latest
-          kubectl rollout status deployment/todo-app-deployment
+          
+          # Apply deployment (will create if doesn't exist)
+          kubectl apply -f - <<EOF
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: todo-app-deployment
+            labels:
+              app: todo-app
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: todo-app
+            template:
+              metadata:
+                labels:
+                  app: todo-app
+              spec:
+                containers:
+                - name: todo-app
+                  image: $IMAGE_REPO:latest
+                  ports:
+                  - containerPort: 5000
+                  env:
+                  - name: ENV
+                    value: "AWS"  # ✅ Use YOUR existing ENV variable
+                  resources:
+                    requests:
+                      memory: "256Mi"
+                      cpu: "250m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "500m"
+                  livenessProbe:
+                    httpGet:
+                      path: /
+                      port: 5000
+                    initialDelaySeconds: 30
+                    periodSeconds: 10
+                  readinessProbe:
+                    httpGet:
+                      path: /
+                      port: 5000
+                    initialDelaySeconds: 5
+                    periodSeconds: 5
+          EOF
 
-      # 9️⃣ Verify deployment.
+          # Apply service (will create if doesn't exist)
+          kubectl apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: todo-app-service
+          spec:
+            selector:
+              app: todo-app
+            ports:
+              - protocol: TCP
+                port: 80
+                targetPort: 5000
+            type: LoadBalancer
+          EOF
+
+      # 9️⃣ Wait for rollout to complete
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/todo-app-deployment --timeout=300s
+
+      # 🔟 Verify deployment
       - name: Verify Deployment
         run: |
-          kubectl get pods
+          echo "=== Pods ==="
+          kubectl get pods -l app=todo-app
+          
+          echo "=== Services ==="
           kubectl get services
-          kubectl describe service todo-app-service
-          kubectl get events --sort-by=.metadata.creationTimestamp
+          
+          echo "=== Deployment Status ==="
+          kubectl get deployment todo-app-deployment
+          
+          echo "=== Pod Logs ==="
+          kubectl logs -l app=todo-app --tail=50
+          
+          echo "=== Recent Events ==="
+          kubectl get events --sort-by=.metadata.creationTimestamp --field-selector involvedObject.name=todo-app-deployment
