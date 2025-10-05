@@ -11,102 +11,46 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Configure AWS OIDC credentials
-      - name: Configure AWS OIDC credentials
+      - name: Configure AWS OIDC
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: eu-west-2
 
-      # 3️⃣ Debug caller identity
-      - name: Debug AWS credentials
-        run: |
-          echo "🔍 Checking AWS identity..."
-          aws sts get-caller-identity
-          echo "✅ AWS credentials configured"
-
-      # 4️⃣ Install kubectl
-      - name: Install kubectl
+      - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      # 5️⃣ Get EKS cluster details
-      - name: Get EKS cluster info
-        id: eks-info
+      - name: Configure EKS access
         run: |
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.endpoint" --output text)
-          CA_DATA=$(aws eks describe-cluster --name Todo-list-App-cluster --region eu-west-2 --query "cluster.certificateAuthority.data" --output text)
-          echo "cluster_endpoint=$CLUSTER_ENDPOINT" >> $GITHUB_OUTPUT
-          echo "ca_data=$CA_DATA" >> $GITHUB_OUTPUT
-          echo "✅ EKS cluster info retrieved"
+          aws eks update-kubeconfig --region eu-west-2 --name Todo-list-App-cluster
 
-      # 6️⃣ Create kubeconfig manually with proper authentication
-      - name: Create kubeconfig manually
-        run: |
-          mkdir -p ~/.kube
-          cat > ~/.kube/config << EOF
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - name: todo-app-cluster
-            cluster:
-              server: ${{ steps.eks-info.outputs.cluster_endpoint }}
-              certificate-authority-data: ${{ steps.eks-info.outputs.ca_data }}
-          contexts:
-          - name: todo-app-context
-            context:
-              cluster: todo-app-cluster
-              user: github-actions-user
-          current-context: todo-app-context
-          users:
-          - name: github-actions-user
-            user:
-              exec:
-                apiVersion: client.authentication.k8s.io/v1beta1
-                command: aws
-                args:
-                - --region
-                - eu-west-2
-                - eks
-                - get-token
-                - --cluster-name
-                - Todo-list-App-cluster
-                # Remove --role-arn since we're already assuming the role via OIDC
-          EOF
-          echo "✅ Kubeconfig created manually"
-
-      # 7️⃣ Verify cluster access
       - name: Verify cluster access
         run: |
           echo "🔐 Testing cluster access..."
           kubectl get nodes
           kubectl auth can-i get pods
 
-      # 8️⃣ Login to Amazon ECR
-      - name: Login to Amazon ECR
+      - name: Login to ECR
         run: |
-          aws ecr get-login-password --region eu-west-2 \
-            | docker login --username AWS --password-stdin 851725622142.dkr.ecr.eu-west-2.amazonaws.com
+          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 851725622142.dkr.ecr.eu-west-2.amazonaws.com
 
-      # 9️⃣ Build and push Docker image
       - name: Build and push Docker image
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           docker build -t $IMAGE_REPO:latest .
           docker push $IMAGE_REPO:latest
 
-      # 🔟 Deploy to EKS
       - name: Deploy to EKS
         run: |
           IMAGE_REPO=851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp
           
+          # Create or update deployment
           kubectl apply -f - <<EOF
           apiVersion: apps/v1
           kind: Deployment
@@ -139,6 +83,7 @@ jobs:
                       cpu: "500m"
           EOF
 
+          # Create or update service
           kubectl apply -f - <<EOF
           apiVersion: v1
           kind: Service
@@ -154,12 +99,10 @@ jobs:
             type: LoadBalancer
           EOF
 
-      # 1️⃣1️⃣ Wait for rollout
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/todo-app-deployment --timeout=300s
 
-      # 1️⃣2️⃣ Verify deployment
-      - name: Verify Deployment
+      - name: Verify deployment
         run: |
           kubectl get pods,services,deployments
