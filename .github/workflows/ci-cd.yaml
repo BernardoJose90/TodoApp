@@ -25,78 +25,20 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-${{ github.run_id }}
-
-      - name: Debug AWS Identity
-        run: |
-          echo "🔍 AWS Identity in GitHub Actions:"
-          aws sts get-caller-identity
-          echo ""
 
       - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      - name: Create kubeconfig manually
+      - name: Configure EKS access
         run: |
-          echo "🔧 Creating kubeconfig manually..."
-          
-          # Get cluster details
-          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.endpoint" --output text)
-          CA_DATA=$(aws eks describe-cluster --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --query "cluster.certificateAuthority.data" --output text)
-          
-          echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
-          
-          # Create kubeconfig directory
-          mkdir -p ~/.kube
-          
-          # Create kubeconfig with explicit authentication
-          cat > ~/.kube/config << EOF
-          apiVersion: v1
-          kind: Config
-          clusters:
-          - cluster:
-              certificate-authority-data: $CA_DATA
-              server: $CLUSTER_ENDPOINT
-            name: eks-cluster
-          contexts:
-          - context:
-              cluster: eks-cluster
-              user: github-actions
-            name: eks-context
-          current-context: eks-context
-          kind: Config
-          users:
-          - name: github-actions
-            user:
-              exec:
-                apiVersion: client.authentication.k8s.io/v1beta1
-                command: aws
-                args:
-                - eks
-                - get-token
-                - --cluster-name
-                - ${{ env.EKS_CLUSTER_NAME }}
-                - --region
-                - ${{ env.AWS_REGION }}
-                env: null
-          EOF
-          
-          echo "✅ Manual kubeconfig created"
-          cat ~/.kube/config
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Test EKS token generation
+      - name: Verify EKS access
         run: |
-          echo "🔍 Testing EKS token generation..."
-          aws eks get-token --cluster-name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }} --output json | jq -r '.status.token' | head -c 50
-          echo "..."
-          echo "✅ Token generated successfully"
-
-      - name: Test kubectl access
-        run: |
-          echo "🔐 Testing kubectl access..."
-          kubectl get nodes --v=6
+          kubectl get nodes
+          echo "✅ EKS access verified!"
 
       - name: Login to ECR
         run: |
@@ -135,9 +77,12 @@ jobs:
                   - containerPort: 5000
                   env:
                   - name: ENV
-                    value: "LOCAL"
+                    value: "AWS"
+                  - name: FLASK_APP
+                    value: "main.py"
+                  - name: FLASK_RUN_HOST
+                    value: "0.0.0.0"
           EOF
-
 
           kubectl apply -f - <<EOF
           apiVersion: v1
@@ -153,4 +98,8 @@ jobs:
               targetPort: 5000
             type: LoadBalancer
           EOF
-      
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/todo-app-deployment
+          kubectl get pods,services
