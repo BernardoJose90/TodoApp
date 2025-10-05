@@ -51,6 +51,17 @@ jobs:
           docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
+      - name: Create IAM Service Account for TodoApp
+        run: |
+          eksctl create iamserviceaccount \
+            --name todo-app-service-account \
+            --namespace default \
+            --cluster TodoApp-Production \
+            --region eu-west-2 \
+            --attach-policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite \
+            --approve \
+            --override-existing-serviceaccounts
+
       - name: Debug current deployment
         run: |
           echo "🔍 Checking current deployment status..."
