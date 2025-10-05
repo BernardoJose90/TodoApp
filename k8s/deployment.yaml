@@ -12,7 +12,7 @@ spec:
       labels:
         app: todo-app
     spec:
-      serviceAccountName: todo-app-sa   # Attach ServiceAccount
+      serviceAccountName: todo-app-service-account  # Attach ServiceAccount
       containers:
       - name: todo-app
         image: <your-dockerhub-username>/todo-list-app:latest
