@@ -22,7 +22,7 @@ jobs:
 
       - name: Debug Environment
         run: |
-          echo "🔍 GitHub Context:"
+          echo " GitHub Context:"
           echo "Event: ${{ github.event_name }}"
           echo "Ref: ${{ github.ref }}"
           echo "SHA: ${{ github.sha }}"
