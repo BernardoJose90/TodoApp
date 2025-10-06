@@ -1,4 +1,4 @@
-name: CI/CD Pipeline with Debug
+name: CI/CD Pipeline
 
 on:
   push:
@@ -16,6 +16,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,33 +24,24 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: ${{ env.AWS_REGION }}
-          role-session-name: GitHubActions-TodoApp
-
-      - name: Verify AWS credentials
-        run: |
-          aws sts get-caller-identity
-          echo "✅ AWS credentials verified!"
+          role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
 
       - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-          kubectl version --client
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
 
       - name: Configure EKS access
         run: |
-          # Update kubeconfig with the assumed role
           aws eks update-kubeconfig \
             --region ${{ env.AWS_REGION }} \
             --name ${{ env.EKS_CLUSTER_NAME }}
-          echo "Kubeconfig updated successfully"
 
-      - name: Verify EKS access
+      - name: Verify cluster access
         run: |
           kubectl get nodes
-          echo "✅ EKS access verified!"
 
       - name: Login to ECR
         run: |
@@ -62,27 +54,15 @@ jobs:
           docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Apply Kubernetes manifests
+      - name: Deploy to EKS
         run: |
-          # Apply all your Kubernetes manifests
           kubectl apply -f configmap.yaml
           kubectl apply -f secret.yaml
           kubectl apply -f serviceaccount.yaml
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
 
-      - name: Wait for deployment
+      - name: Verify deployment
         run: |
-          echo "⏳ Waiting for deployment to be ready..."
           kubectl rollout status deployment/todo-app-deployment --timeout=300s
-          echo "✅ Deployment is ready!"
-
-      - name: Check application status
-        run: |
-          echo "🔍 Checking application status..."
-          kubectl get pods,svc,deploy -l app=todo-app
-
-      - name: Check application logs
-        run: |
-          echo "📋 Checking application logs..."
-          kubectl logs -l app=todo-app --tail=50
+          kubectl get pods,svc,deploy
