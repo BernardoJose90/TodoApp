@@ -9,7 +9,7 @@ if os.getenv("ENV") == "AWS":
 else:
     from app.secrets_local import get_secret  # local testing
 
-# Load database credentials
+# Load database credentials.
 secret = get_secret()
 db_url = f"mysql+pymysql://{secret['username']}:{secret['password']}@{secret['host']}:3306/{secret['dbname']}"
 
