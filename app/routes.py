@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, render_template
 from app import database
 
-# Create Blueprint
+# Create Blueprint.
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
