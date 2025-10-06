@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  EKS_CLUSTER_NAME: TodoApp-Production
+  EKS_CLUSTER_NAME: todoapp-prod-eks-eu-west-2
   ECR_REPOSITORY: webserver/todoapp
 
 permissions:

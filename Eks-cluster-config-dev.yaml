@@ -1,0 +1,25 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: todoapp-prod-eks-eu-west-2
+  region: eu-west-2
+  version: "1.31"
+
+vpc:
+  id: vpc-0064e5f94f9b60267
+  subnets:
+    private:
+      eu-west-2a: { id: subnet-0e1b974362d0f9c63 }  # eks-private-2a
+      eu-west-2b: { id: subnet-07bd4cee0ec263e21 }  # eks-private-2b
+    public:
+      eu-west-2a: { id: subnet-02684afe81a577de4 }  # eks-public-2a
+      eu-west-2c: { id: subnet-07fa70310d4ab37ad }  # eks-public-2c
+
+managedNodeGroups:
+  - name: app-nodes
+    instanceType: t3.small
+    desiredCapacity: 1
+    minSize: 1
+    maxSize: 1
+    volumeSize: 20

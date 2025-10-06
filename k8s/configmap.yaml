@@ -1,9 +1,7 @@
-# Holds non-secret configuration variables for Kubernetes deployment.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: todo-config
+  name: todo-app-config
 data:
-  MYSQL_DB: "todo"
-  MYSQL_HOST: "<MYSQL_HOST>"
-  MYSQL_USER: "<MYSQL_USER>"
+  LOG_LEVEL: "INFO"
+  DATABASE_NAME: "todoapp-database-1"  # Updated to match your RDS instance
