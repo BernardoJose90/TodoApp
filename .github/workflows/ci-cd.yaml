@@ -20,20 +20,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS OIDC
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-TodoApp
+
+      - name: Verify AWS credentials
+        run: |
+          aws sts get-caller-identity
+          echo "✅ AWS credentials verified!"
 
       - name: Setup kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+          kubectl version --client
 
       - name: Configure EKS access
         run: |
-          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          # Update kubeconfig with the assumed role
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
+          echo "Kubeconfig updated successfully"
 
       - name: Verify EKS access
         run: |
@@ -51,59 +62,14 @@ jobs:
           docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
           docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Fix IAM permissions for Secrets Manager
+      - name: Apply Kubernetes manifests
         run: |
-          echo "🔧 Adding Secrets Manager permissions to node role..."
-          aws iam attach-role-policy \
-            --role-name eksctl-TodoApp-Production-nodegrou-NodeInstanceRole-ME7jWEW3uNJM \
-            --policy-arn arn:aws:iam::aws:policy/SecretsManagerReadWrite
-          echo "✅ Added Secrets Manager permissions to node role"
-
-      - name: Debug current deployment
-        run: |
-          echo "🔍 Checking current deployment status..."
-          kubectl get deployments
-          kubectl get pods -l app=todo-app
-          kubectl describe deployment todo-app-deployment || echo "Deployment might not exist yet"
-
-      - name: Deploy to EKS
-        run: |
-          IMAGE_URL=851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          
-          echo "🚀 Deploying Todo App to EKS..."
-          
-          kubectl apply -f - <<EOF
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: todo-app-deployment
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: todo-app
-            template:
-              metadata:
-                labels:
-                  app: todo-app
-              spec:
-                containers:
-                - name: todo-app
-                  image: $IMAGE_URL
-                  ports:
-                  - containerPort: 5000
-                  env:
-                  - name: ENV
-                    value: "AWS"
-                  - name: FLASK_APP
-                    value: "main.py"
-                  - name: FLASK_RUN_HOST
-                    value: "0.0.0.0"
-                  - name: PYTHONPATH
-                    value: "/app"
-                  command: ["/bin/sh"]
-                  args: ["-c", "python -c 'import app; print(\"App imports successful\")' && flask run"]
-          EOF
+          # Apply all your Kubernetes manifests
+          kubectl apply -f configmap.yaml
+          kubectl apply -f secret.yaml
+          kubectl apply -f serviceaccount.yaml
+          kubectl apply -f deployment.yaml
+          kubectl apply -f service.yaml
 
       - name: Wait for deployment
         run: |
@@ -114,28 +80,9 @@ jobs:
       - name: Check application status
         run: |
           echo "🔍 Checking application status..."
-          sleep 10
-          kubectl get pods -l app=todo-app -o wide
-          kubectl get deployment todo-app-deployment
+          kubectl get pods,svc,deploy -l app=todo-app
 
       - name: Check application logs
         run: |
           echo "📋 Checking application logs..."
-          kubectl logs -l app=todo-app --tail=100
-
-      - name: Create service if not exists
-        run: |
-          kubectl apply -f - <<EOF || echo "Service may already exist"
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: todo-app-service
-          spec:
-            type: LoadBalancer
-            selector:
-              app: todo-app
-            ports:
-            - protocol: TCP
-              port: 80
-              targetPort: 5000
-          EOF
+          kubectl logs -l app=todo-app --tail=50
