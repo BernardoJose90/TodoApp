@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline with Debug
 
 on:
   push:
@@ -27,32 +27,119 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
 
+      - name: Debug AWS credentials
+        run: |
+          echo "=== AWS CREDENTIALS DEBUG ==="
+          echo "AWS Identity:"
+          aws sts get-caller-identity
+          echo ""
+          echo "Environment Variables:"
+          echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:10}..."
+          echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:0:10}..." 
+          echo "AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:0:10}..."
+          echo "AWS_REGION: $AWS_REGION"
+          echo ""
+
+      - name: Debug EKS cluster access
+        run: |
+          echo "=== EKS CLUSTER DEBUG ==="
+          echo "Listing EKS clusters:"
+          aws eks list-clusters --region $AWS_REGION --output table
+          echo ""
+          echo "Describing our cluster:"
+          aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.status"
+          echo ""
+
       - name: Setup kubectl
         run: |
+          echo "=== KUBECTL SETUP ==="
           curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
+          kubectl version --client
 
-      - name: Configure EKS access
+      - name: Manual kubeconfig creation
         run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ env.EKS_CLUSTER_NAME }}
+          echo "=== MANUAL KUBECONFIG CREATION ==="
+          # Get cluster details
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.endpoint" --output text)
+          CLUSTER_CA=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.certificateAuthority.data" --output text)
+          
+          echo "Cluster Endpoint: $CLUSTER_ENDPOINT"
+          echo "Cluster CA: ${CLUSTER_CA:0:50}..."
+          
+          # Create kubeconfig directory
+          mkdir -p ~/.kube
+          
+          # Create kubeconfig manually with explicit role
+          cat > ~/.kube/config << EOF
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              certificate-authority-data: $CLUSTER_CA
+              server: $CLUSTER_ENDPOINT
+            name: $EKS_CLUSTER_NAME
+          contexts:
+          - context:
+              cluster: $EKS_CLUSTER_NAME
+              user: github-actions-user
+            name: $EKS_CLUSTER_NAME
+          current-context: $EKS_CLUSTER_NAME
+          users:
+          - name: github-actions-user
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                - --region
+                - $AWS_REGION
+                - eks
+                - get-token
+                - --cluster-name
+                - $EKS_CLUSTER_NAME
+                - --role-arn
+                - arn:aws:iam::851725622142:role/GitHubActions-EKS-Role
+          EOF
+          
+          echo "Kubeconfig created:"
+          cat ~/.kube/config
 
-      - name: Verify cluster access
+      - name: Test kubectl access
         run: |
+          echo "=== KUBECTL ACCESS TEST ==="
+          echo "Current context:"
+          kubectl config current-context
+          echo ""
+          echo "Context details:"
+          kubectl config view --minify
+          echo ""
+          echo "Testing cluster access..."
           kubectl get nodes
+          echo "✅ SUCCESS: Kubectl access working!"
 
+      - name: Debug kubeconfig authentication
+        if: failure()
+        run: |
+          echo "=== AUTHENTICATION DEBUG ==="
+          echo "Testing AWS EKS get-token directly:"
+          aws eks get-token --cluster-name $EKS_CLUSTER_NAME --region $AWS_REGION --role-arn arn:aws:iam::851725622142:role/GitHubActions-EKS-Role || echo "Token generation failed"
+          
+          echo "Raw kubeconfig:"
+          cat ~/.kube/config
+
+      # Continue with the rest of your deployment steps...
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin 851725622142.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build and push Docker image
         run: |
-          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
-          docker tag ${{ env.ECR_REPOSITORY }}:latest 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          docker push 851725622142.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+          docker build -t $ECR_REPOSITORY:latest .
+          docker tag $ECR_REPOSITORY:latest 851725622142.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+          docker push 851725622142.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
       - name: Deploy to EKS
         run: |
