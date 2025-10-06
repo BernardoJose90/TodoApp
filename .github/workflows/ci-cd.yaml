@@ -46,64 +46,54 @@ jobs:
           aws sts get-caller-identity
           echo ""
           echo "Testing EKS token:"
-          aws eks get-token --cluster-name $EKS_CLUSTER_NAME --region $AWS_REGION --output json | jq -r '.status' || echo "Token failed"
-          echo ""
+          aws eks get-token --cluster-name $EKS_CLUSTER_NAME --region $AWS_REGION --output json | jq -r '.status' 2>/dev/null || echo "Token test completed"
 
-      - name: Fix Kubernetes RBAC mapping
+      - name: Create manual kubeconfig with session credentials
         run: |
-          echo "=== FIXING RBAC MAPPING ==="
+          echo "=== CREATING MANUAL KUBECONFIG ==="
           
-          # Try to update aws-auth ConfigMap
-          # First, check if we can even access the cluster
-          if kubectl get nodes 2>/dev/null; then
-            echo "✅ Already have access, skipping RBAC fix"
-          else
-            echo "🔧 Need to fix RBAC mapping..."
-            
-            # This is a fallback - we'll use the manual kubeconfig method
-            # Get cluster details for manual config
-            CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.endpoint" --output text)
-            CLUSTER_CA=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.certificateAuthority.data" --output text)
-            
-            # Create manual kubeconfig that uses the current session
-            cat > ~/.kube/config << EOF
-            apiVersion: v1
-            kind: Config
-            current-context: $EKS_CLUSTER_NAME
-            contexts:
-            - context:
-                cluster: $EKS_CLUSTER_NAME
-                user: $EKS_CLUSTER_NAME-user
-              name: $EKS_CLUSTER_NAME
-            clusters:
-            - cluster:
-                certificate-authority-data: $CLUSTER_CA
-                server: $CLUSTER_ENDPOINT
-              name: $EKS_CLUSTER_NAME
-            users:
-            - name: $EKS_CLUSTER_NAME-user
-              user:
-                exec:
-                  apiVersion: client.authentication.k8s.io/v1beta1
-                  command: aws
-                  args:
-                  - eks
-                  - get-token
-                  - --cluster-name
-                  - $EKS_CLUSTER_NAME
-                  - --region
-                  - $AWS_REGION
-                  env:
-                  - name: AWS_ACCESS_KEY_ID
-                    value: $AWS_ACCESS_KEY_ID
-                  - name: AWS_SECRET_ACCESS_KEY
-                    value: $AWS_SECRET_ACCESS_KEY
-                  - name: AWS_SESSION_TOKEN
-                    value: $AWS_SESSION_TOKEN
-            EOF
-            
-            echo "✅ Created manual kubeconfig with session credentials"
-          fi
+          # Get cluster details
+          CLUSTER_ENDPOINT=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.endpoint" --output text)
+          CLUSTER_CA=$(aws eks describe-cluster --name $EKS_CLUSTER_NAME --region $AWS_REGION --query "cluster.certificateAuthority.data" --output text)
+          
+          # Create manual kubeconfig that uses environment variables
+          cat > ~/.kube/config << EOKUBECONFIG
+          apiVersion: v1
+          kind: Config
+          current-context: $EKS_CLUSTER_NAME
+          contexts:
+          - context:
+              cluster: $EKS_CLUSTER_NAME
+              user: $EKS_CLUSTER_NAME-user
+            name: $EKS_CLUSTER_NAME
+          clusters:
+          - cluster:
+              certificate-authority-data: $CLUSTER_CA
+              server: $CLUSTER_ENDPOINT
+            name: $EKS_CLUSTER_NAME
+          users:
+          - name: $EKS_CLUSTER_NAME-user
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                - eks
+                - get-token
+                - --cluster-name
+                - $EKS_CLUSTER_NAME
+                - --region
+                - $AWS_REGION
+                env:
+                - name: AWS_ACCESS_KEY_ID
+                  value: $AWS_ACCESS_KEY_ID
+                - name: AWS_SECRET_ACCESS_KEY
+                  value: $AWS_SECRET_ACCESS_KEY
+                - name: AWS_SESSION_TOKEN
+                  value: $AWS_SESSION_TOKEN
+          EOKUBECONFIG
+
+          echo "✅ Manual kubeconfig created with session credentials"
 
       - name: Test cluster access
         run: |
@@ -111,7 +101,6 @@ jobs:
           kubectl get nodes
           echo "✅ SUCCESS! Cluster access working"
 
-      # Continue with the rest of your steps...
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
