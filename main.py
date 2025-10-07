@@ -17,4 +17,5 @@ except Exception as e:
 app.register_blueprint(bp)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # CRITICAL: Set debug=False for production/container environments
+    app.run(host='0.0.0.0', port=5000, debug=False)

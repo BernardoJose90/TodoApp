@@ -14,7 +14,7 @@ spec:
       labels:
         app: todo-app
     spec:
-      serviceAccountName: todo-app-sa
+      serviceAccountName: todo-app-sa  # IRSA: todo-app-rds-secret-read-Role
       containers:
         - name: todo-app
           image: 851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp:latest
@@ -31,6 +31,13 @@ spec:
               value: "0.0.0.0"
             - name: PYTHONPATH
               value: "/app"
+            # AWS IRSA environment (automatically mounted)
+            - name: AWS_STS_REGIONAL_ENDPOINTS
+              value: "regional"
+            - name: AWS_ROLE_ARN
+              value: "arn:aws:iam::851725622142:role/todo-app-rds-secret-read-Role"
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
           resources:
             requests:
               memory: "128Mi"
@@ -42,11 +49,13 @@ spec:
             httpGet:
               path: /health
               port: 5000
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /health
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 5
+            failureThreshold: 3
