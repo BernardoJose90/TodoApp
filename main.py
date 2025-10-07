@@ -1,29 +1,20 @@
+import os
 from flask import Flask
 from app import database
-import os
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), 'app', 'templates'))
     
-    # Initialize database (this won't crash the app anymore)
+    # Initialize database
     try:
         database.create_tables()
         print("Database initialized successfully")
     except Exception as e:
         print(f"Database initialization warning: {e}")
-        # App continues to run even if DB fails
     
-    # Import and register routes
-    try:
-        from app.routes import bp
-        app.register_blueprint(bp)
-        print("Routes registered successfully")
-    except ImportError as e:
-        print(f"Routes import warning: {e}")
-        # Create a simple health check if routes fail
-        @app.route('/health')
-        def health():
-            return {"status": "healthy", "database": "unknown"}
+    # Register routes
+    from app.routes import bp
+    app.register_blueprint(bp)
     
     return app
 
