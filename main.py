@@ -3,7 +3,7 @@ from app import database
 import os
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder='app/templates')
     
     # Initialize database (this won't crash the app anymore)
     try:
