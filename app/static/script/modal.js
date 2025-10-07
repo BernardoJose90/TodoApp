@@ -10,15 +10,15 @@ $(document).ready(function() {
 
             // Persist order to backend
             $.ajax({
-                url: '/reorder',
+                url: '/tasks/reorder',
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify(order),
+                data: JSON.stringify({ tasks: order }),
                 success: function(response) {
-                    if(response.success) console.log('Task order updated!');
+                    console.log('Task order updated!', response);
                 },
-                error: function(err) {
-                    console.error('Error updating order:', err);
+                error: function(xhr, status, error) {
+                    console.error('Error updating order:', error, xhr.responseText);
                 }
             });
         }
@@ -49,27 +49,38 @@ $(document).ready(function() {
                 return;
             }
 
-            let url = '/create';
-            if (taskId) url = `/edit/${taskId}`;
+            let url = '/tasks';
+            let method = 'POST';
+            
+            if (taskId) {
+                url = `/tasks/${taskId}`;
+                method = 'PUT';
+            }
+
+            console.log('Sending request:', { url, method, description, status, priority, due_date });
 
             $.ajax({
                 url: url,
-                type: 'POST',
+                type: method,
                 contentType: 'application/json',
-                data: JSON.stringify({ description, status, priority, due_date }),
+                data: JSON.stringify({ 
+                    task: description,  // Changed from 'description' to 'task'
+                    status: status, 
+                    priority: priority, 
+                    due_date: due_date 
+                }),
                 success: function(response) {
-                    if(response.success) {
-                        $('#task-modal').modal('hide');
-                        $('#task-desc').val('');
-                        $('#task-status').val('Todo');
-                        $('#task-priority').val('Medium');
-                        $('#task-due-date').val('');
-                        refreshTable();
-                    }
+                    console.log('Success response:', response);
+                    $('#task-modal').modal('hide');
+                    $('#task-desc').val('');
+                    $('#task-status').val('Todo');
+                    $('#task-priority').val('Medium');
+                    $('#task-due-date').val('');
+                    refreshTable();
                 },
-                error: function(err) {
-                    alert("Error saving task!");
-                    console.error(err);
+                error: function(xhr, status, error) {
+                    console.error('Error saving task:', error, xhr.responseText);
+                    alert("Error saving task: " + (xhr.responseJSON?.error || error));
                 }
             });
         });
@@ -100,23 +111,28 @@ $(document).ready(function() {
         if (!confirm("Are you sure you want to delete this task?")) return;
 
         $.ajax({
-            url: `/delete/${taskId}`,
-            type: 'POST',
+            url: `/tasks/${taskId}`,
+            type: 'DELETE',
             success: function(response) {
-                if (response.success) refreshTable();
+                console.log('Delete successful:', response);
+                refreshTable();
             },
-            error: function(err) {
-                alert("Error deleting task!");
-                console.error(err);
+            error: function(xhr, status, error) {
+                console.error('Error deleting task:', error, xhr.responseText);
+                alert("Error deleting task: " + (xhr.responseJSON?.error || error));
             }
         });
     });
 
     // Refresh table helper
     function refreshTable() {
-        $.get('/', function(data) {
-            const newTableBody = $(data).find('tbody').html();
-            $('#task-table-body').html(newTableBody);
+        $.get('/tasks', function(tasks) {
+            console.log('Tasks loaded:', tasks);
+            // You'll need to update this to properly render the table
+            // based on your actual HTML structure
+            location.reload(); // Simple refresh for now
+        }).fail(function(err) {
+            console.error('Error loading tasks:', err);
         });
     }
 });

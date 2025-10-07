@@ -37,6 +37,11 @@ spec:
               value: "arn:aws:iam::851725622142:role/todo-app-rds-secret-read-Role"
             - name: AWS_WEB_IDENTITY_TOKEN_FILE
               value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+          # ADD THIS: Volume mount for AWS token
+          volumeMounts:
+            - name: aws-iam-token
+              mountPath: /var/run/secrets/eks.amazonaws.com/serviceaccount
+              readOnly: true
           resources:
             requests:
               memory: "128Mi"
@@ -56,3 +61,12 @@ spec:
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 5
+      # ADD THIS: Volume definition
+      volumes:
+        - name: aws-iam-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: sts.amazonaws.com
+                  expirationSeconds: 86400
+                  path: token
