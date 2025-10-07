@@ -4,4 +4,4 @@ metadata:
   name: todo-app-config
 data:
   LOG_LEVEL: "INFO"
-  DATABASE_NAME: "todo"  # Updated to match your RDS instance
+  DATABASE_NAME: "todo"  # Updated to match your RDS instance.
