@@ -29,9 +29,13 @@ $(document).ready(function() {
     });
 
     // Filter tasks
-    $('.filter').on('click', function() {
+    $('.filter-btn').on('click', function() {
         const status = $(this).data('status');
         console.log('🔍 Filtering by status:', status);
+        
+        // Update active state
+        $('.filter-btn').removeClass('active');
+        $(this).addClass('active');
         
         $('#task-table-body tr').each(function() {
             if (status === 'All' || $(this).data('status') === status) {
@@ -107,29 +111,61 @@ $(document).ready(function() {
     }
 
     // Add new task
-    $('#task-modal').on('show.bs.modal', function() {
-        resetModal();
-        setupSubmit();
+    $('#task-modal').on('show.bs.modal', function(e) {
+        // Only reset if it's not an edit operation
+        if (!$(e.relatedTarget).hasClass('edit')) {
+            resetModal();
+            setupSubmit();
+        }
     });
 
-    // Edit task
+    // Edit task - FIXED VERSION
     $(document).on('click', '.edit', function() {
         const row = $(this).closest('tr');
         const taskId = $(this).data('id');
         
-        console.log('✏️ Editing task ID:', taskId);
+        console.log('✏️ Editing task ID:', taskId, 'Row data:', row.data());
 
-        $('#task-desc').val(row.find('td:nth-child(2) .fw-semibold').text());
-        $('#task-status').val(row.find('.status-badge').text().trim());
-        $('#task-priority').val(row.find('.badge').text().trim());
+        // Extract description (text from the fw-semibold element)
+        const description = row.find('td:nth-child(2) .fw-semibold').text().trim();
         
-        // Get due date from the small text
-        const dueDateText = row.find('td:nth-child(2) small').text().replace('⏰', '').trim();
-        $('#task-due-date').val(dueDateText);
+        // Extract status from data attribute or badge text
+        const status = row.data('status') || row.find('.status-badge').text().trim();
+        
+        // Extract priority from badge text
+        const priorityText = row.find('.badge').text().trim();
+        const priority = priorityText === 'High' ? 'High' : 
+                        priorityText === 'Medium' ? 'Medium' : 'Low';
+        
+        // Extract due date - look in multiple possible locations
+        let dueDate = '';
+        const dueDateTd = row.find('td:nth-child(5)');
+        if (dueDateTd.length) {
+            dueDate = dueDateTd.text().trim();
+            // Remove hyphen if present
+            if (dueDate === '-') dueDate = '';
+        }
+        
+        // Also check the small text in description column as fallback
+        if (!dueDate) {
+            const dueDateSmall = row.find('td:nth-child(2) small');
+            if (dueDateSmall.length) {
+                dueDate = dueDateSmall.text().replace('⏰', '').trim();
+            }
+        }
+        
+        console.log('📝 Extracted data:', { description, status, priority, dueDate });
+
+        // Populate modal
+        $('#task-desc').val(description);
+        $('#task-status').val(status);
+        $('#task-priority').val(priority);
+        $('#task-due-date').val(dueDate);
         
         $('#modal-title').text('Edit Task');
         $('#task-modal').modal('show');
 
+        // Setup submit handler for this specific task
         setupSubmit(taskId);
     });
 
@@ -186,4 +222,10 @@ $(document).ready(function() {
 
     // Initialize stats
     updateStats();
+
+    // Debug: Log all edit buttons
+    console.log('🔍 Found edit buttons:', $('.edit').length);
+    $('.edit').each(function() {
+        console.log('  - Edit button:', $(this).data('id'));
+    });
 });

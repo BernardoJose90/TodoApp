@@ -86,47 +86,47 @@
           <tbody id="task-table-body">
             {% for item in items %}
             <tr class="fade-in priority-{{ item.priority|lower }}"
-                data-id="{{ item.id }}" 
-                data-status="{{ item.status }}">
-              <td class="fw-bold text-muted">#{{ item.id }}</td>
-              <td>
-                <div class="task-content">
-                  <div class="fw-semibold">{{ item.description }}</div>
-                  {% if item.due_date %}
-                  <small class="text-muted">
-                    <i class="far fa-clock me-1"></i>{{ item.due_date }}
-                  </small>
-                  {% endif %}
-                </div>
-              </td>
-              <td>
-                <span class="status-badge status-{{ item.status|lower|replace(' ', '-') }}">
-                  {{ item.status }}
-                </span>
-              </td>
-              <td>
-                <span class="badge bg-{% if item.priority == 'High' %}danger{% elif item.priority == 'Medium' %}warning{% else %}success{% endif %}">
-                  {{ item.priority }}
-                </span>
-              </td>
-              <td>
-                {% if item.due_date %}
-                <span class="text-muted">{{ item.due_date }}</span>
-                {% else %}
-                <span class="text-muted">-</span>
-                {% endif %}
-              </td>
-              <td>
-                <div class="btn-group btn-group-sm">
-                  <button class="btn btn-outline-primary edit" data-id="{{ item.id }}" title="Edit">
-                    <i class="fas fa-edit"></i>
-                  </button>
-                  <button class="btn btn-outline-danger delete" data-id="{{ item.id }}" title="Delete">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
+            data-id="{{ item.id }}" 
+            data-status="{{ item.status }}">
+          <td class="fw-bold text-muted">#{{ item.id }}</td>
+          <td>
+            <div class="task-content">
+              <div class="fw-semibold">{{ item.description }}</div>
+              {% if item.due_date %}
+              <small class="text-muted">
+                <i class="far fa-clock me-1"></i>{{ item.due_date }}
+              </small>
+              {% endif %}
+            </div>
+          </td>
+          <td>
+            <span class="status-badge status-{{ item.status|lower|replace(' ', '-') }}">
+              {{ item.status }}
+            </span>
+          </td>
+          <td>
+            <span class="badge bg-{% if item.priority == 'High' %}danger{% elif item.priority == 'Medium' %}warning{% else %}success{% endif %}">
+              {{ item.priority }}
+            </span>
+          </td>
+          <td>
+            {% if item.due_date %}
+            <span class="text-muted">{{ item.due_date }}</span>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-primary edit" data-id="{{ item.id }}" title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button class="btn btn-outline-danger delete" data-id="{{ item.id }}" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
             {% endfor %}
           </tbody>
         </table>
