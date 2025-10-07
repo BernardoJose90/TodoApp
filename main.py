@@ -1,8 +1,10 @@
+import os
 from flask import Flask
 from app import database
 from app.routes import bp
 
-app = Flask(__name__, template_folder="app/templates")
+template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/templates")
+app = Flask(__name__, template_folder=template_dir)
 
 # Initialize database
 try:
