@@ -89,7 +89,7 @@ def fetch_todo(order_by_position=True, filter_status=None):
             return [
                 {
                     "id": task.id,
-                    "task": task.description,
+                    "description": task.description,  # CHANGED: 'task' to 'description'
                     "status": task.status,
                     "priority": task.priority,
                     "due_date": task.due_date,

@@ -40,7 +40,7 @@
       {% for item in items %}
       <tr data-id="{{item.id}}" data-status="{{item.status}}">
         <td>{{item.id}}</td>
-        <td>{{item.task}}</td>
+        <td>{{item.description}}</td>  <!-- CHANGED: item.task to item.description -->
         <td>{{item.status}}</td>
         <td>{{item.priority}}</td>
         <td>{{item.due_date}}</td>
