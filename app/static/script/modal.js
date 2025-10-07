@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - MODAL FIX VERSION');
+    console.log('🔧 modal.js loaded - SIMPLIFIED WORKING VERSION');
 
     // DRAG-AND-DROP using Sortable
     new Sortable(document.getElementById('task-table-body'), {
@@ -47,6 +47,9 @@ $(document).ready(function() {
         
         updateStats();
     });
+
+    // Global variable to track current task being edited
+    let currentEditTaskId = null;
 
     // Add/Edit Task Modal
     function setupSubmit(taskId = null) {
@@ -107,18 +110,17 @@ $(document).ready(function() {
         $('#task-priority').val('Medium');
         $('#task-due-date').val('');
         $('#modal-title').text('Add New Task');
+        currentEditTaskId = null;
         $('#submit-task').off('click');
     }
 
     // Add new task
-    $('#task-modal').on('show.bs.modal', function(e) {
-        if (!$(e.relatedTarget).hasClass('edit')) {
-            resetModal();
-            setupSubmit();
-        }
+    $('#add-task-btn').on('click', function() {
+        resetModal();
+        setupSubmit();
     });
 
-    // Edit task - FIXED MODAL TRIGGER
+    // Edit task - SIMPLIFIED AND WORKING
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -126,7 +128,8 @@ $(document).ready(function() {
         const taskId = $(this).data('id');
         const row = $(this).closest('tr');
         
-        console.log('✏️ Editing task ID:', taskId);
+        console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
+        console.log('📊 Row element:', row);
 
         // Extract task data
         const description = row.find('.fw-semibold').first().text().trim();
@@ -155,13 +158,35 @@ $(document).ready(function() {
         $('#task-due-date').val(dueDate);
         $('#modal-title').text('Edit Task');
 
-        // FIX: Use proper Bootstrap 5 modal show method
+        // Store current task ID
+        currentEditTaskId = taskId;
+
+        // FIX: Use the simplest possible modal show method
         const modalElement = document.getElementById('task-modal');
-        const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
-        modal.show();
+        
+        // Method 1: Try Bootstrap 5 way
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            console.log('🚀 Using Bootstrap 5 Modal');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } 
+        // Method 2: Try jQuery way (if Bootstrap jQuery plugin is loaded)
+        else if ($.fn.modal) {
+            console.log('🚀 Using jQuery Modal');
+            $(modalElement).modal('show');
+        }
+        // Method 3: Manual show as fallback
+        else {
+            console.log('🚀 Using manual modal show');
+            $(modalElement).addClass('show');
+            $(modalElement).css('display', 'block');
+            $('.modal-backdrop').addClass('show');
+        }
 
         // Setup submit handler
         setupSubmit(taskId);
+        
+        console.log('✅ Modal should be visible now');
     });
 
     // Delete task
@@ -212,5 +237,27 @@ $(document).ready(function() {
     // Initialize stats
     updateStats();
 
-    console.log('🔍 Edit buttons ready:', $('.edit').length);
+    // Debug: Check what's available
+    console.log('🔧 Available modal methods:');
+    console.log(' - bootstrap.Modal:', typeof bootstrap?.Modal);
+    console.log(' - $.fn.modal:', typeof $.fn?.modal);
+    console.log(' - Edit buttons:', $('.edit').length);
 });
+
+// Global function to test modal manually
+function testModal() {
+    console.log('🧪 Testing modal manually...');
+    const modalElement = document.getElementById('task-modal');
+    if (modalElement) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            console.log('✅ Modal shown via Bootstrap');
+        } else {
+            $(modalElement).modal('show');
+            console.log('✅ Modal shown via jQuery');
+        }
+    } else {
+        console.log('❌ Modal element not found');
+    }
+}
