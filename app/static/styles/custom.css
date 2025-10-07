@@ -195,6 +195,26 @@
     border-color: var(--primary);
   }
   
+  /* Action Buttons - ENHANCED VISIBILITY */
+  .btn-group-sm .btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    border: 1px solid transparent;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  
+  .edit, .delete {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: all 0.2s ease;
+  }
+  
+  .edit:hover, .delete:hover {
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  
   /* Loading States */
   .loading {
     opacity: 0.6;
@@ -245,6 +265,10 @@
     .btn {
       padding: 0.6rem 1.2rem;
     }
+    
+    .btn-group-sm .btn {
+      padding: 0.25rem 0.5rem;
+    }
   }
   
   /* Animation Classes */
@@ -264,4 +288,10 @@
   @keyframes slideIn {
     from { transform: translateX(-100%); }
     to { transform: translateX(0); }
+  }
+  
+  /* Debug helper for button visibility */
+  .debug-buttons .edit {
+    border: 2px solid #007bff !important;
+    background-color: rgba(0, 123, 255, 0.1) !important;
   }

@@ -66,7 +66,7 @@
       
       <button class="btn btn-primary" id="add-task-btn">
         <i class="fas fa-plus me-2"></i>New Task
-    </button>
+      </button>
     </div>
 
     <!-- Tasks Table -->
@@ -86,47 +86,47 @@
           <tbody id="task-table-body">
             {% for item in items %}
             <tr class="fade-in priority-{{ item.priority|lower }}"
-            data-id="{{ item.id }}" 
-            data-status="{{ item.status }}">
-          <td class="fw-bold text-muted">#{{ item.id }}</td>
-          <td>
-            <div class="task-content">
-              <div class="fw-semibold">{{ item.description }}</div>
-              {% if item.due_date %}
-              <small class="text-muted">
-                <i class="far fa-clock me-1"></i>{{ item.due_date }}
-              </small>
-              {% endif %}
-            </div>
-          </td>
-          <td>
-            <span class="status-badge status-{{ item.status|lower|replace(' ', '-') }}">
-              {{ item.status }}
-            </span>
-          </td>
-          <td>
-            <span class="badge bg-{% if item.priority == 'High' %}danger{% elif item.priority == 'Medium' %}warning{% else %}success{% endif %}">
-              {{ item.priority }}
-            </span>
-          </td>
-          <td>
-            {% if item.due_date %}
-            <span class="text-muted">{{ item.due_date }}</span>
-            {% else %}
-            <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="btn-group btn-group-sm">
-              <button class="btn btn-outline-primary edit" data-id="{{ item.id }}" title="Edit">
-                <i class="fas fa-edit"></i>
-              </button>
-              <button class="btn btn-outline-danger delete" data-id="{{ item.id }}" title="Delete">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
+                data-id="{{ item.id }}" 
+                data-status="{{ item.status }}">
+              <td class="fw-bold text-muted">#{{ item.id }}</td>
+              <td>
+                <div class="task-content">
+                  <div class="fw-semibold">{{ item.description }}</div>
+                  {% if item.due_date %}
+                  <small class="text-muted">
+                    <i class="far fa-clock me-1"></i>{{ item.due_date }}
+                  </small>
+                  {% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="status-badge status-{{ item.status|lower|replace(' ', '-') }}">
+                  {{ item.status }}
+                </span>
+              </td>
+              <td>
+                <span class="badge bg-{% if item.priority == 'High' %}danger{% elif item.priority == 'Medium' %}warning{% else %}success{% endif %}">
+                  {{ item.priority }}
+                </span>
+              </td>
+              <td>
+                {% if item.due_date %}
+                <span class="text-muted">{{ item.due_date }}</span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-primary edit" data-id="{{ item.id }}" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-outline-danger delete" data-id="{{ item.id }}" title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -138,9 +138,9 @@
       <i class="fas fa-clipboard-list"></i>
       <h4>No tasks found</h4>
       <p>Get started by creating your first task!</p>
-      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#task-modal" id="add-task-btn">
+      <button class="btn btn-primary" id="add-task-btn-empty">
         <i class="fas fa-plus me-2"></i>New Task
-    </button>
+      </button>
     </div>
   </div>
 
@@ -202,9 +202,8 @@
   </div>
 
   <script src="{{ url_for('static', filename='script/modal.js') }}"></script>
+  
   <script>
-
-
     // Update stats
     function updateStats() {
       const total = document.querySelectorAll('#task-table-body tr:not([style*="display: none"])').length;
@@ -224,85 +223,6 @@
     // Initialize stats
     updateStats();
   </script>
-
-<script>
-  // Debug function to test API endpoints
-  async function testAPI() {
-      console.log('🔍 Testing API endpoints...');
-      
-      try {
-          // Test GET /tasks
-          const response = await fetch('/tasks');
-          const tasks = await response.json();
-          console.log('✅ GET /tasks:', tasks);
-          
-          // Test POST /tasks
-          const testTask = {
-              description: 'Test task from debug',
-              status: 'Todo',
-              priority: 'Medium',
-              due_date: null
-          };
-          
-          const postResponse = await fetch('/tasks', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify(testTask)
-          });
-          const result = await postResponse.json();
-          console.log('✅ POST /tasks:', result);
-          
-      } catch (error) {
-          console.error('❌ API Error:', error);
-      }
-  }
   
-  // Run API test when page loads
-  document.addEventListener('DOMContentLoaded', function() {
-      console.log('🚀 App loaded - testing CRUD operations');
-      testAPI();
-      
-      // Add click listeners to debug buttons
-      document.querySelectorAll('.edit, .delete').forEach(btn => {
-          btn.addEventListener('click', function(e) {
-              console.log('🖱️ Button clicked:', this.className, 'ID:', this.dataset.id);
-          });
-      });
-  });
-  
-  // Enhanced error handling for AJAX
-  $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
-      console.error('❌ AJAX Error:', {
-          url: settings.url,
-          method: settings.type,
-          status: jqxhr.status,
-          error: thrownError,
-          response: jqxhr.responseText
-      });
-  });
-  </script>
-<script>
-  // Temporary debug helper
-  document.addEventListener('DOMContentLoaded', function() {
-      console.log('🔄 DOM loaded - setting up debug listeners');
-      
-      // Add click listeners to all edit buttons
-      document.querySelectorAll('.edit').forEach(button => {
-          button.addEventListener('click', function(e) {
-              console.log('🎯 EDIT BUTTON CLICKED:', {
-                  id: this.dataset.id,
-                  classList: this.classList,
-                  event: e
-              });
-              e.preventDefault();
-              e.stopPropagation();
-          });
-      });
-      
-      // Test if jQuery is working
-      console.log('💰 jQuery version:', $?.fn?.jquery);
-      console.log('🔍 Edit buttons via jQuery:', $('.edit').length);
-  });
-  </script>
 </body>
 </html>

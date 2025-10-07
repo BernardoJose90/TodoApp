@@ -1,11 +1,15 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - CLEAN VERSION');
+    console.log('🔧 modal.js loaded - ENHANCED VERSION');
 
     // Initialize modal
     let taskModal = null;
     if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
         taskModal = new bootstrap.Modal(document.getElementById('task-modal'));
     }
+
+    // Debug: Check button visibility
+    console.log('🔍 Total edit buttons found:', $('.edit').length);
+    console.log('🔍 Total delete buttons found:', $('.delete').length);
 
     // DRAG-AND-DROP
     new Sortable(document.getElementById('task-table-body'), {
@@ -85,11 +89,7 @@ $(document).ready(function() {
                 }),
                 success: function(response) {
                     console.log('✅ Task saved successfully');
-                    if (taskModal) {
-                        taskModal.hide();
-                    } else {
-                        $('#task-modal').modal('hide');
-                    }
+                    hideModal();
                     resetModal();
                     refreshTable();
                 },
@@ -111,64 +111,78 @@ $(document).ready(function() {
         $('#submit-task').off('click');
     }
 
-    // NEW TASK
-    $(document).on('click', '#add-task-btn', function(e) {
-        console.log('➕ New Task button clicked');
-        resetModal();
-        setupSubmit();
-        
+    // MODAL FUNCTIONS
+    function showModal() {
         if (taskModal) {
             taskModal.show();
         } else {
             $('#task-modal').modal('show');
         }
+    }
+
+    function hideModal() {
+        if (taskModal) {
+            taskModal.hide();
+        } else {
+            $('#task-modal').modal('hide');
+        }
+    }
+
+    // NEW TASK
+    $(document).on('click', '#add-task-btn, #add-task-btn-empty', function(e) {
+        console.log('➕ New Task button clicked');
+        resetModal();
+        setupSubmit();
+        showModal();
     });
 
-    // EDIT TASK - SIMPLE AND DIRECT
+    // EDIT TASK - ENHANCED VERSION
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        e.stopImmediatePropagation();
         
         const taskId = $(this).data('id');
         const row = $(this).closest('tr');
         
         console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
+        console.log('📊 Row data:', row.data());
 
-        // Extract data using the proven selectors
-        const description = row.find('td').eq(1).find('.fw-semibold').text().trim();
-        const status = row.data('status');
-        const priority = row.find('td').eq(3).find('.badge').text().trim();
+        // Extract data with multiple fallback methods
+        let description = row.find('.fw-semibold').first().text().trim();
+        let status = row.data('status');
+        let priority = row.find('.badge').first().text().trim();
         let dueDate = row.find('td').eq(4).text().trim();
-        if (dueDate === '-') dueDate = '';
+        
+        // Fallback if due date shows "-"
+        if (dueDate === '-' || dueDate === 'No due date') {
+            dueDate = '';
+        }
 
-        console.log('📝 EXTRACTED DATA:', { description, status, priority, dueDate });
+        console.log('📝 EXTRACTED DATA:', { 
+            description, 
+            status, 
+            priority, 
+            dueDate 
+        });
 
-        // DIRECTLY populate modal fields
-        document.getElementById('task-desc').value = description;
-        document.getElementById('task-status').value = status;
-        document.getElementById('task-priority').value = priority;
-        document.getElementById('task-due-date').value = dueDate;
-        document.getElementById('modal-title').textContent = 'Edit Task';
+        // Populate modal fields using jQuery for consistency
+        $('#task-desc').val(description);
+        $('#task-status').val(status);
+        $('#task-priority').val(priority);
+        $('#task-due-date').val(dueDate);
+        $('#modal-title').text('Edit Task');
 
-        console.log('✅ Modal populated directly with DOM');
-
-        // Setup submit handler
+        // Setup submit handler for this specific task
         setupSubmit(taskId);
         
         // Show modal
-        if (taskModal) {
-            taskModal.show();
-        } else {
-            $('#task-modal').modal('show');
-        }
+        showModal();
     });
 
     // DELETE TASK
     $(document).on('click', '.delete', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        e.stopImmediatePropagation();
         
         const taskId = $(this).data('id');
         console.log('🗑️ Deleting task ID:', taskId);
@@ -212,5 +226,5 @@ $(document).ready(function() {
 
     // INITIALIZE
     updateStats();
-    console.log('✅ Clean modal.js loaded successfully');
+    console.log('✅ Enhanced modal.js loaded successfully');
 });
