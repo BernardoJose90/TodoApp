@@ -1,35 +1,72 @@
-containers:
-- name: todo-app
-  image: 851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp:latest
-  ports:
-  - containerPort: 5000
-  env:
-  - name: ENV
-    value: "AWS"
-  - name: AWS_REGION
-    value: "eu-west-2"
-  - name: FLASK_APP
-    value: "main.py"
-  - name: FLASK_RUN_HOST
-    value: "0.0.0.0"
-  - name: PYTHONPATH
-    value: "/app"
-  resources:
-    requests:
-      memory: "128Mi"
-      cpu: "100m"
-    limits:
-      memory: "256Mi"
-      cpu: "200m"
-  livenessProbe:
-    httpGet:
-      path: /health
-      port: 5000
-    initialDelaySeconds: 30
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /health
-      port: 5000
-    initialDelaySeconds: 5
-    periodSeconds: 5
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app-deployment
+  labels:
+    app: todo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: todo-app
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      serviceAccountName: todo-app-sa
+      containers:
+        - name: todo-app
+          image: 851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: ENV
+              value: "AWS"
+            - name: AWS_REGION
+              value: "eu-west-2"
+            - name: FLASK_APP
+              value: "main.py"
+            - name: FLASK_RUN_HOST
+              value: "0.0.0.0"
+            - name: PYTHONPATH
+              value: "/app"
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: todo-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: todo-db-secret
+                  key: password
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: todo-db-secret
+                  key: host
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: todo-db-secret
+                  key: dbname
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
