@@ -1,5 +1,5 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - ENHANCED VERSION');
+    console.log('🔧 modal.js loaded - ADVANCED VERSION');
 
     // Initialize modal
     let taskModal = null;
@@ -11,7 +11,13 @@ $(document).ready(function() {
     console.log('🔍 Total edit buttons found:', $('.edit').length);
     console.log('🔍 Total delete buttons found:', $('.delete').length);
 
-    // DRAG-AND-DROP
+    // Initialize advanced features
+    initViewToggle();
+    initSearch();
+    initKanbanDragAndDrop();
+    highlightDueDates();
+
+    // DRAG-AND-DROP for table view
     new Sortable(document.getElementById('task-table-body'), {
         animation: 150,
         handle: '.task-content',
@@ -43,14 +49,8 @@ $(document).ready(function() {
         $('.filter-btn').removeClass('active');
         $(this).addClass('active');
         
-        $('#task-table-body tr').each(function() {
-            if (status === 'All' || $(this).data('status') === status) {
-                $(this).show();
-            } else {
-                $(this).hide();
-            }
-        });
-        
+        // Filter all views
+        filterTasksByStatus(status);
         updateStats();
     });
 
@@ -142,30 +142,31 @@ $(document).ready(function() {
         e.stopPropagation();
         
         const taskId = $(this).data('id');
-        const row = $(this).closest('tr');
+        const card = $(this).closest('.task-card, tr');
         
         console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
-        console.log('📊 Row data:', row.data());
 
-        // Extract data with multiple fallback methods
-        let description = row.find('.fw-semibold').first().text().trim();
-        let status = row.data('status');
-        let priority = row.find('.badge').first().text().trim();
-        let dueDate = row.find('td').eq(4).text().trim();
+        // Extract data from card or table row
+        let description, status, priority, dueDate;
         
-        // Fallback if due date shows "-"
-        if (dueDate === '-' || dueDate === 'No due date') {
-            dueDate = '';
+        if (card.hasClass('task-card')) {
+            // Card view
+            description = card.find('.task-title').text().trim();
+            status = card.data('status');
+            priority = card.find('.task-priority').text().trim();
+            dueDate = card.find('.due-date').text().trim();
+        } else {
+            // Table view
+            description = card.find('td').eq(1).find('.fw-semibold').text().trim();
+            status = card.data('status');
+            priority = card.find('td').eq(3).find('.badge').text().trim();
+            dueDate = card.find('td').eq(4).text().trim();
+            if (dueDate === '-') dueDate = '';
         }
 
-        console.log('📝 EXTRACTED DATA:', { 
-            description, 
-            status, 
-            priority, 
-            dueDate 
-        });
+        console.log('📝 EXTRACTED DATA:', { description, status, priority, dueDate });
 
-        // Populate modal fields using jQuery for consistency
+        // Populate modal fields
         $('#task-desc').val(description);
         $('#task-status').val(status);
         $('#task-priority').val(priority);
@@ -203,6 +204,112 @@ $(document).ready(function() {
         });
     });
 
+    // VIEW TOGGLE FUNCTIONALITY
+    function initViewToggle() {
+        $('.view-btn').on('click', function() {
+            const view = $(this).data('view');
+            $('.view-btn').removeClass('active');
+            $(this).addClass('active');
+            
+            // Hide all views
+            $('.view-section').hide();
+            
+            // Show selected view
+            $(`#${view}-view`).show();
+            
+            // Reinitialize features for the active view
+            if (view === 'kanban') {
+                initKanbanDragAndDrop();
+            }
+            
+            updateStats();
+        });
+    }
+
+    // SEARCH FUNCTIONALITY
+    function initSearch() {
+        $('#task-search').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            filterTasksBySearch(searchTerm);
+            updateStats();
+        });
+    }
+
+    // FILTER TASKS BY SEARCH
+    function filterTasksBySearch(searchTerm) {
+        $('.task-card, #task-table-body tr').each(function() {
+            const text = $(this).text().toLowerCase();
+            if (text.includes(searchTerm)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    }
+
+    // FILTER TASKS BY STATUS
+    function filterTasksByStatus(status) {
+        $('.task-card, #task-table-body tr').each(function() {
+            if (status === 'All' || $(this).data('status') === status) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    }
+
+    // KANBAN DRAG AND DROP
+    function initKanbanDragAndDrop() {
+        $('.kanban-cards').each(function() {
+            new Sortable(this, {
+                group: 'kanban',
+                animation: 150,
+                onEnd: function(evt) {
+                    const taskId = evt.item.dataset.id;
+                    const newStatus = evt.to.closest('.kanban-column').dataset.status;
+                    
+                    console.log(`🔄 Moving task ${taskId} to ${newStatus}`);
+                    
+                    $.ajax({
+                        url: `/tasks/${taskId}`,
+                        type: 'PUT',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ status: newStatus }),
+                        success: function(response) {
+                            console.log('✅ Task status updated');
+                            updateStats();
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('❌ Error updating task status:', error);
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    // DUE DATE HIGHLIGHTING
+    function highlightDueDates() {
+        const today = new Date();
+        
+        $('.task-card').each(function() {
+            const dueDateText = $(this).find('.due-date').text();
+            if (dueDateText) {
+                const dueDate = new Date(dueDateText);
+                const diffTime = dueDate - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                $(this).removeClass('overdue due-soon');
+                
+                if (diffDays < 0) {
+                    $(this).addClass('overdue');
+                } else if (diffDays <= 3) {
+                    $(this).addClass('due-soon');
+                }
+            }
+        });
+    }
+
     // REFRESH TABLE
     function refreshTable() {
         console.log('🔄 Refreshing table...');
@@ -211,21 +318,26 @@ $(document).ready(function() {
 
     // UPDATE STATS
     function updateStats() {
-        const total = $('#task-table-body tr:visible').length;
-        const todo = $('#task-table-body tr[data-status="Todo"]:visible').length;
-        const progress = $('#task-table-body tr[data-status="In Progress"]:visible').length;
-        const done = $('#task-table-body tr[data-status="Done"]:visible').length;
+        const total = $('.task-card:visible, #task-table-body tr:visible').length;
+        const todo = $('.task-card[data-status="Todo"]:visible, #task-table-body tr[data-status="Todo"]:visible').length;
+        const progress = $('.task-card[data-status="In Progress"]:visible, #task-table-body tr[data-status="In Progress"]:visible').length;
+        const done = $('.task-card[data-status="Done"]:visible, #task-table-body tr[data-status="Done"]:visible').length;
         
         $('#total-tasks').text(total);
         $('#todo-tasks').text(todo);
         $('#progress-tasks').text(progress);
         $('#done-tasks').text(done);
         
+        // Update kanban counts
+        $('#todo-count').text(todo);
+        $('#progress-count').text(progress);
+        $('#done-count').text(done);
+        
         $('#empty-state').toggle(total === 0);
     }
 
     // INITIALIZE
     updateStats();
-    console.log('✅ Enhanced modal.js loaded successfully');
+    console.log('✅ Advanced modal.js loaded successfully');
 });
 
