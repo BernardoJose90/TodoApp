@@ -1,7 +1,7 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - DATA EXTRACTION FIX');
+    console.log('🔧 modal.js loaded - FINAL WORKING VERSION');
 
-    // EMERGENCY MODAL FUNCTIONS
+    // SIMPLE MODAL FUNCTIONS
     function showModal() {
         console.log('🔄 Showing modal...');
         const modal = document.getElementById('task-modal');
@@ -14,11 +14,8 @@ $(document).ready(function() {
             backdrop.className = 'modal-backdrop fade show';
             document.body.appendChild(backdrop);
             
-            console.log('✅ Modal shown manually');
-            return true;
+            console.log('✅ Modal shown');
         }
-        console.log('❌ Modal element not found');
-        return false;
     }
 
     function hideModal() {
@@ -31,8 +28,6 @@ $(document).ready(function() {
             
             const backdrops = document.querySelectorAll('.modal-backdrop');
             backdrops.forEach(backdrop => backdrop.remove());
-            
-            console.log('✅ Modal hidden');
         }
     }
 
@@ -46,19 +41,17 @@ $(document).ready(function() {
                 order.push({ id: $(this).data('id'), position: index });
             });
 
-            console.log('🔄 Reordering tasks:', order);
-
             $.ajax({
                 url: '/tasks/reorder',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ tasks: order }),
                 success: function(response) {
-                    console.log('✅ Task order updated:', response);
+                    console.log('✅ Task order updated');
                 },
                 error: function(xhr, status, error) {
-                    console.error('❌ Error updating order:', error, xhr.responseText);
-                    alert("Error updating task order: " + (xhr.responseJSON?.error || error));
+                    console.error('❌ Error updating order:', error);
+                    alert("Error updating task order: " + error);
                 }
             });
         }
@@ -67,8 +60,6 @@ $(document).ready(function() {
     // FILTER TASKS
     $('.filter-btn').on('click', function() {
         const status = $(this).data('status');
-        console.log('🔍 Filtering by status:', status);
-        
         $('.filter-btn').removeClass('active');
         $(this).addClass('active');
         
@@ -117,14 +108,14 @@ $(document).ready(function() {
                     due_date: due_date 
                 }),
                 success: function(response) {
-                    console.log('✅ Task saved successfully:', response);
+                    console.log('✅ Task saved successfully');
                     hideModal();
                     resetModal();
                     refreshTable();
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error saving task:', error);
-                    alert("Error saving task: " + (xhr.responseJSON?.error || error));
+                    alert("Error saving task: " + error);
                 }
             });
         });
@@ -142,12 +133,13 @@ $(document).ready(function() {
 
     // NEW TASK
     $(document).on('click', '#add-task-btn', function(e) {
-        console.log('➕ New Task button clicked via JavaScript');
+        console.log('➕ New Task button clicked');
         resetModal();
         setupSubmit();
+        showModal();
     });
 
-    // EDIT TASK - FIXED DATA EXTRACTION
+    // EDIT TASK - SIMPLE AND RELIABLE
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -156,77 +148,36 @@ $(document).ready(function() {
         const row = $(this).closest('tr');
         
         console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
-        console.log('📊 Row found:', row.length > 0);
 
-        // FIXED DATA EXTRACTION - More reliable method
-        let description = '';
-        let status = '';
-        let priority = '';
-        let dueDate = '';
+        // SIMPLE DATA EXTRACTION - Using the working method from debug
+        const description = row.find('td').eq(1).find('.fw-semibold').text().trim();
+        const status = row.data('status');
+        const priority = row.find('td').eq(3).find('.badge').text().trim();
+        let dueDate = row.find('td').eq(4).text().trim();
+        if (dueDate === '-') dueDate = '';
 
-        try {
-            // Method 1: Try direct text extraction from each cell
-            const cells = row.find('td');
-            
-            // Cell 0: ID (skip)
-            // Cell 1: Description
-            description = cells.eq(1).find('.fw-semibold').text().trim();
-            if (!description) {
-                description = cells.eq(1).text().trim();
-            }
-            
-            // Cell 2: Status
-            status = cells.eq(2).find('.status-badge').text().trim();
-            if (!status) {
-                status = row.data('status') || 'Todo';
-            }
-            
-            // Cell 3: Priority
-            priority = cells.eq(3).find('.badge').text().trim();
-            
-            // Cell 4: Due Date
-            dueDate = cells.eq(4).text().trim();
-            if (dueDate === '-') dueDate = '';
-            
-            // Fallback: Check small text in description cell
-            if (!dueDate) {
-                dueDate = cells.eq(1).find('small').text().replace('⏰', '').trim();
-            }
+        console.log('📝 EXTRACTED DATA:', { description, status, priority, dueDate, taskId });
 
-        } catch (error) {
-            console.error('❌ Error extracting data:', error);
-            
-            // Fallback: Use data attributes
-            description = row.find('.fw-semibold').first().text().trim();
-            status = row.data('status') || 'Todo';
-            priority = row.find('.badge').first().text().trim() || 'Medium';
-        }
-
-        console.log('📝 FINAL EXTRACTED DATA:', { 
-            description, 
-            status, 
-            priority, 
-            dueDate,
-            taskId 
-        });
-
-        // Populate modal - with validation
-        if (description) {
+        // POPULATE MODAL - With small delay to ensure DOM is ready
+        setTimeout(() => {
             $('#task-desc').val(description);
-        } else {
-            console.warn('⚠️ No description found');
-            $('#task-desc').val('Task description not found');
-        }
-        
-        $('#task-status').val(status || 'Todo');
-        $('#task-priority').val(priority || 'Medium');
-        $('#task-due-date').val(dueDate || '');
-        $('#modal-title').text('Edit Task');
+            $('#task-status').val(status);
+            $('#task-priority').val(priority);
+            $('#task-due-date').val(dueDate);
+            $('#modal-title').text('Edit Task');
+            
+            console.log('✅ Modal populated with:', {
+                desc: $('#task-desc').val(),
+                status: $('#task-status').val(), 
+                priority: $('#task-priority').val(),
+                dueDate: $('#task-due-date').val()
+            });
+        }, 50);
 
-        console.log('✅ Modal populated with data');
-
-        // Setup submit and show modal
+        // Setup submit handler
         setupSubmit(taskId);
+        
+        // Show modal
         showModal();
     });
 
@@ -244,17 +195,17 @@ $(document).ready(function() {
             url: `/tasks/${taskId}`,
             type: 'DELETE',
             success: function(response) {
-                console.log('✅ Delete successful:', response);
+                console.log('✅ Delete successful');
                 refreshTable();
             },
             error: function(xhr, status, error) {
                 console.error('❌ Error deleting task:', error);
-                alert("Error deleting task: " + (xhr.responseJSON?.error || error));
+                alert("Error deleting task: " + error);
             }
         });
     });
 
-    // CLOSE MODAL HANDLERS
+    // CLOSE MODAL
     $('#task-modal .btn-close, #task-modal .btn-secondary').on('click', function() {
         hideModal();
     });
@@ -282,15 +233,6 @@ $(document).ready(function() {
 
     // INITIALIZE
     updateStats();
-    console.log('✅ Fixed modal.js loaded successfully');
-
-    // Make debug function available
-    window.debugTaskData = function(taskId) {
-        const row = $(`tr[data-id="${taskId}"]`);
-        console.log('🔍 Debug task:', taskId, 'Row:', row);
-        if (row.length) {
-            console.log('Row HTML:', row.html());
-        }
-    };
+    console.log('✅ modal.js fully loaded and ready');
 });
 
