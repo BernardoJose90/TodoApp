@@ -203,24 +203,7 @@
 
   <script src="{{ url_for('static', filename='script/modal.js') }}"></script>
   <script>
-    // Initialize drag and drop
-    new Sortable(document.getElementById('task-table-body'), {
-      animation: 150,
-      handle: '.task-content',
-      onEnd: function(evt) {
-        let order = [];
-        document.querySelectorAll('#task-table-body tr').forEach((row, index) => {
-          order.push({id: row.dataset.id, position: index});
-        });
-        
-        // Update order via AJAX
-        fetch('/tasks/reorder', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({tasks: order})
-        });
-      }
-    });
+    
 
     // Update stats
     function updateStats() {

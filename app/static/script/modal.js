@@ -1,9 +1,11 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded');
+    console.log('🔧 modal.js loaded - EDIT FIXED VERSION');
 
+    // Remove the duplicate Sortable initialization - keep only one
     // DRAG-AND-DROP using Sortable
     new Sortable(document.getElementById('task-table-body'), {
         animation: 150,
+        handle: '.task-content', // Only allow dragging by the task content
         onEnd: function(evt) {
             let order = [];
             $('#task-table-body tr').each(function(index) {
@@ -119,58 +121,65 @@ $(document).ready(function() {
         }
     });
 
-    // Edit task - FIXED VERSION
-    $(document).on('click', '.edit', function() {
-        const row = $(this).closest('tr');
+    // Edit task - SIMPLIFIED AND FIXED
+    $(document).on('click', '.edit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const taskId = $(this).data('id');
+        const row = $(this).closest('tr');
         
-        console.log('✏️ Editing task ID:', taskId, 'Row data:', row.data());
+        console.log('✏️ Editing task ID:', taskId);
+        console.log('📊 Row data:', row.data());
 
-        // Extract description (text from the fw-semibold element)
-        const description = row.find('td:nth-child(2) .fw-semibold').text().trim();
+        // Get data directly from data attributes and elements
+        const description = row.find('.fw-semibold').first().text().trim();
+        const status = row.data('status');
+        const priority = row.find('.badge').first().text().trim();
         
-        // Extract status from data attribute or badge text
-        const status = row.data('status') || row.find('.status-badge').text().trim();
-        
-        // Extract priority from badge text
-        const priorityText = row.find('.badge').text().trim();
-        const priority = priorityText === 'High' ? 'High' : 
-                        priorityText === 'Medium' ? 'Medium' : 'Low';
-        
-        // Extract due date - look in multiple possible locations
+        // Get due date - try multiple locations
         let dueDate = '';
-        const dueDateTd = row.find('td:nth-child(5)');
-        if (dueDateTd.length) {
-            dueDate = dueDateTd.text().trim();
-            // Remove hyphen if present
-            if (dueDate === '-') dueDate = '';
+        const dueDateCell = row.find('td').eq(4); // 5th column (0-indexed)
+        if (dueDateCell.length && dueDateCell.text().trim() !== '-') {
+            dueDate = dueDateCell.text().trim();
         }
         
-        // Also check the small text in description column as fallback
+        // Fallback to small text in description column
         if (!dueDate) {
-            const dueDateSmall = row.find('td:nth-child(2) small');
+            const dueDateSmall = row.find('small');
             if (dueDateSmall.length) {
                 dueDate = dueDateSmall.text().replace('⏰', '').trim();
             }
         }
-        
-        console.log('📝 Extracted data:', { description, status, priority, dueDate });
 
-        // Populate modal
+        console.log('📝 Extracted data:', { 
+            description, 
+            status, 
+            priority, 
+            dueDate,
+            taskId 
+        });
+
+        // Populate modal fields
         $('#task-desc').val(description);
         $('#task-status').val(status);
         $('#task-priority').val(priority);
         $('#task-due-date').val(dueDate);
         
         $('#modal-title').text('Edit Task');
+        
+        // Show modal
         $('#task-modal').modal('show');
-
-        // Setup submit handler for this specific task
+        
+        // Setup submit handler for this task
         setupSubmit(taskId);
     });
 
     // Delete task
-    $(document).on('click', '.delete', function() {
+    $(document).on('click', '.delete', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const taskId = $(this).data('id');
         console.log('🗑️ Deleting task ID:', taskId);
 
@@ -193,16 +202,8 @@ $(document).ready(function() {
     // Refresh table helper
     function refreshTable() {
         console.log('🔄 Refreshing table...');
-        $.get('/tasks')
-            .done(function(tasks) {
-                console.log('✅ Tasks loaded:', tasks);
-                // For now, use simple reload
-                location.reload();
-            })
-            .fail(function(err) {
-                console.error('❌ Error loading tasks:', err);
-                alert('Error loading tasks. Check console for details.');
-            });
+        // Use location reload for now to ensure clean state
+        location.reload();
     }
 
     // Update stats
@@ -223,9 +224,12 @@ $(document).ready(function() {
     // Initialize stats
     updateStats();
 
-    // Debug: Log all edit buttons
-    console.log('🔍 Found edit buttons:', $('.edit').length);
-    $('.edit').each(function() {
-        console.log('  - Edit button:', $(this).data('id'));
+    // Debug: Check if edit buttons are properly bound
+    console.log('🔍 Edit buttons found:', $('.edit').length);
+    $('.edit').each(function(i) {
+        console.log(`  Edit button ${i}:`, {
+            id: $(this).data('id'),
+            text: $(this).find('i').attr('class')
+        });
     });
 });
