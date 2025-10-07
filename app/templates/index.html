@@ -203,7 +203,7 @@
 
   <script src="{{ url_for('static', filename='script/modal.js') }}"></script>
   <script>
-    
+
 
     // Update stats
     function updateStats() {
@@ -279,6 +279,29 @@
           error: thrownError,
           response: jqxhr.responseText
       });
+  });
+  </script>
+<script>
+  // Temporary debug helper
+  document.addEventListener('DOMContentLoaded', function() {
+      console.log('🔄 DOM loaded - setting up debug listeners');
+      
+      // Add click listeners to all edit buttons
+      document.querySelectorAll('.edit').forEach(button => {
+          button.addEventListener('click', function(e) {
+              console.log('🎯 EDIT BUTTON CLICKED:', {
+                  id: this.dataset.id,
+                  classList: this.classList,
+                  event: e
+              });
+              e.preventDefault();
+              e.stopPropagation();
+          });
+      });
+      
+      // Test if jQuery is working
+      console.log('💰 jQuery version:', $?.fn?.jquery);
+      console.log('🔍 Edit buttons via jQuery:', $('.edit').length);
   });
   </script>
 </body>
