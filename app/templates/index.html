@@ -241,5 +241,62 @@
     // Initialize stats
     updateStats();
   </script>
+
+<script>
+  // Debug function to test API endpoints
+  async function testAPI() {
+      console.log('🔍 Testing API endpoints...');
+      
+      try {
+          // Test GET /tasks
+          const response = await fetch('/tasks');
+          const tasks = await response.json();
+          console.log('✅ GET /tasks:', tasks);
+          
+          // Test POST /tasks
+          const testTask = {
+              description: 'Test task from debug',
+              status: 'Todo',
+              priority: 'Medium',
+              due_date: null
+          };
+          
+          const postResponse = await fetch('/tasks', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(testTask)
+          });
+          const result = await postResponse.json();
+          console.log('✅ POST /tasks:', result);
+          
+      } catch (error) {
+          console.error('❌ API Error:', error);
+      }
+  }
+  
+  // Run API test when page loads
+  document.addEventListener('DOMContentLoaded', function() {
+      console.log('🚀 App loaded - testing CRUD operations');
+      testAPI();
+      
+      // Add click listeners to debug buttons
+      document.querySelectorAll('.edit, .delete').forEach(btn => {
+          btn.addEventListener('click', function(e) {
+              console.log('🖱️ Button clicked:', this.className, 'ID:', this.dataset.id);
+          });
+      });
+  });
+  
+  // Enhanced error handling for AJAX
+  $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
+      console.error('❌ AJAX Error:', {
+          url: settings.url,
+          method: settings.type,
+          status: jqxhr.status,
+          error: thrownError,
+          response: jqxhr.responseText
+      });
+  });
+  </script>
 </body>
 </html>

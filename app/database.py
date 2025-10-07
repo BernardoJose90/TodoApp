@@ -1,5 +1,6 @@
 import os
-from datetime import date
+import traceback  # ADD THIS IMPORT
+from datetime import date, datetime  # ADD datetime import
 from sqlalchemy import create_engine, Column, Integer, String, Enum, Date
 from sqlalchemy.orm import declarative_base, sessionmaker
 import logging
@@ -75,9 +76,25 @@ def get_session():
     init_db()
     return SessionLocal()
 
+def parse_date(date_string):
+    """Safely parse date string to date object"""
+    if not date_string:
+        return None
+    try:
+        if isinstance(date_string, date):
+            return date_string
+        if isinstance(date_string, datetime):
+            return date_string.date()
+        # Parse string date
+        return datetime.strptime(str(date_string), '%Y-%m-%d').date()
+    except (ValueError, TypeError) as e:
+        logger.warning(f"Could not parse date '{date_string}': {e}")
+        return None
+
 def fetch_todo(order_by_position=True, filter_status=None):
     """Fetch all tasks, optionally filtering by status."""
     try:
+        logger.info("fetch_todo called")
         with get_session() as session:
             query = session.query(Task)
             if filter_status:
@@ -90,23 +107,34 @@ def fetch_todo(order_by_position=True, filter_status=None):
             tasks = query.all()
             logger.info(f"DEBUG: Found {len(tasks)} tasks in database")
             
-            result = [
-                {
+            result = []
+            for task in tasks:
+                task_data = {
                     "id": task.id,
                     "description": task.description,
                     "status": task.status,
                     "priority": task.priority,
-                    "due_date": task.due_date.isoformat() if task.due_date else None,
+                    "due_date": None,
                     "position": task.position,
                 }
-                for task in tasks
-            ]
+                
+                # Handle due_date safely
+                if task.due_date:
+                    if hasattr(task.due_date, 'isoformat'):
+                        # It's a date object
+                        task_data["due_date"] = task.due_date.isoformat()
+                    else:
+                        # It's already a string or other type
+                        task_data["due_date"] = str(task.due_date)
+                        logger.warning(f"Task {task.id} has string due_date: {task.due_date}")
+                
+                result.append(task_data)
             
-            logger.info(f"DEBUG: Returning tasks: {result}")
             return result
             
     except Exception as e:
         logger.error(f"Error fetching tasks: {e}")
+        logger.error(traceback.format_exc())
         return []
 
 def insert_new_task(description, status="Todo", priority="Medium", due_date=None, position=None):
@@ -116,16 +144,21 @@ def insert_new_task(description, status="Todo", priority="Medium", due_date=None
             if position is None:
                 max_pos = session.query(Task.position).order_by(Task.position.desc()).first()
                 position = (max_pos[0] or 0) + 1 if max_pos else 1
+            
+            # Parse due_date to ensure it's a proper date object
+            parsed_due_date = parse_date(due_date)
+            
             task = Task(
                 description=description,
                 status=status,
                 priority=priority,
-                due_date=due_date,
+                due_date=parsed_due_date,
                 position=position
             )
             session.add(task)
             session.commit()
             session.refresh(task)
+            logger.info(f"Inserted task with ID: {task.id}")
             return task.id
     except Exception as e:
         logger.error(f"Error inserting task: {e}")
@@ -137,6 +170,7 @@ def update_task(task_id, description=None, status=None, priority=None, due_date=
         with get_session() as session:
             task = session.get(Task, task_id)
             if not task:
+                logger.error(f"Task {task_id} not found for update")
                 return False
             if description is not None:
                 task.description = description
@@ -145,13 +179,15 @@ def update_task(task_id, description=None, status=None, priority=None, due_date=
             if priority is not None:
                 task.priority = priority
             if due_date is not None:
-                task.due_date = due_date
+                # Parse due_date to ensure it's a proper date object
+                task.due_date = parse_date(due_date)
             if position is not None:
                 task.position = position
             session.commit()
+            logger.info(f"Updated task {task_id}")
             return True
     except Exception as e:
-        logger.error(f"Error updating task: {e}")
+        logger.error(f"Error updating task {task_id}: {e}")
         return False
 
 def remove_task_by_id(task_id):
@@ -160,12 +196,14 @@ def remove_task_by_id(task_id):
         with get_session() as session:
             task = session.get(Task, task_id)
             if not task:
+                logger.error(f"Task {task_id} not found for deletion")
                 return False
             session.delete(task)
             session.commit()
+            logger.info(f"Deleted task {task_id}")
             return True
     except Exception as e:
-        logger.error(f"Error deleting task: {e}")
+        logger.error(f"Error deleting task {task_id}: {e}")
         return False
 
 def reorder_tasks(task_list):
@@ -177,6 +215,7 @@ def reorder_tasks(task_list):
                 if task:
                     task.position = task_info["position"]
             session.commit()
+            logger.info(f"Reordered {len(task_list)} tasks")
             return True
     except Exception as e:
         logger.error(f"Error reordering tasks: {e}")
