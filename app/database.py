@@ -61,7 +61,7 @@ class Task(Base):
 def create_tables():
     """Create tables if they don't exist"""
     try:
-        init_db()  # Ensure DB is initialized
+        init_db()  # Ensure DB is initialized.
         Base.metadata.create_all(bind=engine)
         logger.info("Tables created successfully")
     except Exception as e:
