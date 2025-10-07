@@ -130,7 +130,7 @@ $(document).ready(function() {
             console.log('Tasks loaded:', tasks);
             // You'll need to update this to properly render the table
             // based on your actual HTML structure
-            location.reload(); // Simple refresh for now
+            location.reload(); // Simple refresh for now.
         }).fail(function(err) {
             console.error('Error loading tasks:', err);
         });
