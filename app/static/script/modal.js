@@ -1,7 +1,7 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - EMERGENCY FIX VERSION');
+    console.log('🔧 modal.js loaded - DATA EXTRACTION FIX');
 
-    // EMERGENCY MODAL FUNCTIONS - GUARANTEED TO WORK
+    // EMERGENCY MODAL FUNCTIONS
     function showModal() {
         console.log('🔄 Showing modal...');
         const modal = document.getElementById('task-modal');
@@ -10,7 +10,6 @@ $(document).ready(function() {
             modal.classList.add('show');
             document.body.classList.add('modal-open');
             
-            // Add backdrop
             const backdrop = document.createElement('div');
             backdrop.className = 'modal-backdrop fade show';
             document.body.appendChild(backdrop);
@@ -30,7 +29,6 @@ $(document).ready(function() {
             modal.classList.remove('show');
             document.body.classList.remove('modal-open');
             
-            // Remove backdrop
             const backdrops = document.querySelectorAll('.modal-backdrop');
             backdrops.forEach(backdrop => backdrop.remove());
             
@@ -142,17 +140,14 @@ $(document).ready(function() {
         $('#submit-task').off('click');
     }
 
-    // NEW TASK - USING BOOTSTRAP'S BUILT-IN FUNCTIONALITY
-    // The button already has data-bs-toggle="modal" so it should work automatically
-    // But we'll also add a JavaScript fallback
+    // NEW TASK
     $(document).on('click', '#add-task-btn', function(e) {
         console.log('➕ New Task button clicked via JavaScript');
         resetModal();
         setupSubmit();
-        // Don't call showModal() here - let Bootstrap handle it
     });
 
-    // EDIT TASK - SIMPLE AND RELIABLE
+    // EDIT TASK - FIXED DATA EXTRACTION
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -161,37 +156,78 @@ $(document).ready(function() {
         const row = $(this).closest('tr');
         
         console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
+        console.log('📊 Row found:', row.length > 0);
 
-        // Extract data
-        const description = row.find('.fw-semibold').first().text().trim();
-        const status = row.data('status');
-        const priority = row.find('.badge').first().text().trim();
-        
+        // FIXED DATA EXTRACTION - More reliable method
+        let description = '';
+        let status = '';
+        let priority = '';
         let dueDate = '';
-        const dueDateCell = row.find('td').eq(4);
-        if (dueDateCell.length && dueDateCell.text().trim() !== '-') {
-            dueDate = dueDateCell.text().trim();
+
+        try {
+            // Method 1: Try direct text extraction from each cell
+            const cells = row.find('td');
+            
+            // Cell 0: ID (skip)
+            // Cell 1: Description
+            description = cells.eq(1).find('.fw-semibold').text().trim();
+            if (!description) {
+                description = cells.eq(1).text().trim();
+            }
+            
+            // Cell 2: Status
+            status = cells.eq(2).find('.status-badge').text().trim();
+            if (!status) {
+                status = row.data('status') || 'Todo';
+            }
+            
+            // Cell 3: Priority
+            priority = cells.eq(3).find('.badge').text().trim();
+            
+            // Cell 4: Due Date
+            dueDate = cells.eq(4).text().trim();
+            if (dueDate === '-') dueDate = '';
+            
+            // Fallback: Check small text in description cell
+            if (!dueDate) {
+                dueDate = cells.eq(1).find('small').text().replace('⏰', '').trim();
+            }
+
+        } catch (error) {
+            console.error('❌ Error extracting data:', error);
+            
+            // Fallback: Use data attributes
+            description = row.find('.fw-semibold').first().text().trim();
+            status = row.data('status') || 'Todo';
+            priority = row.find('.badge').first().text().trim() || 'Medium';
+        }
+
+        console.log('📝 FINAL EXTRACTED DATA:', { 
+            description, 
+            status, 
+            priority, 
+            dueDate,
+            taskId 
+        });
+
+        // Populate modal - with validation
+        if (description) {
+            $('#task-desc').val(description);
+        } else {
+            console.warn('⚠️ No description found');
+            $('#task-desc').val('Task description not found');
         }
         
-        if (!dueDate) {
-            const dueDateSmall = row.find('small');
-            if (dueDateSmall.length) {
-                dueDate = dueDateSmall.text().replace('⏰', '').trim();
-            }
-        }
-
-        console.log('📝 Extracted data:', { description, status, priority, dueDate, taskId });
-
-        // Populate modal
-        $('#task-desc').val(description);
-        $('#task-status').val(status);
-        $('#task-priority').val(priority);
-        $('#task-due-date').val(dueDate);
+        $('#task-status').val(status || 'Todo');
+        $('#task-priority').val(priority || 'Medium');
+        $('#task-due-date').val(dueDate || '');
         $('#modal-title').text('Edit Task');
+
+        console.log('✅ Modal populated with data');
 
         // Setup submit and show modal
         setupSubmit(taskId);
-        showModal(); // Use our guaranteed showModal function
+        showModal();
     });
 
     // DELETE TASK
@@ -246,10 +282,15 @@ $(document).ready(function() {
 
     // INITIALIZE
     updateStats();
-    console.log('✅ Emergency modal.js loaded successfully');
+    console.log('✅ Fixed modal.js loaded successfully');
 
-    // TEST: Make manual modal function available
-    window.manualShowModal = showModal;
-    window.manualHideModal = hideModal;
+    // Make debug function available
+    window.debugTaskData = function(taskId) {
+        const row = $(`tr[data-id="${taskId}"]`);
+        console.log('🔍 Debug task:', taskId, 'Row:', row);
+        if (row.length) {
+            console.log('Row HTML:', row.html());
+        }
+    };
 });
 
