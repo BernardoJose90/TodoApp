@@ -86,17 +86,25 @@ def fetch_todo(order_by_position=True, filter_status=None):
                 query = query.order_by(Task.position)
             else:
                 query = query.order_by(Task.id)
-            return [
+            
+            tasks = query.all()
+            logger.info(f"DEBUG: Found {len(tasks)} tasks in database")
+            
+            result = [
                 {
                     "id": task.id,
-                    "description": task.description,  # CHANGED: 'task' to 'description'
+                    "description": task.description,
                     "status": task.status,
                     "priority": task.priority,
-                    "due_date": task.due_date,
+                    "due_date": task.due_date.isoformat() if task.due_date else None,
                     "position": task.position,
                 }
-                for task in query.all()
+                for task in tasks
             ]
+            
+            logger.info(f"DEBUG: Returning tasks: {result}")
+            return result
+            
     except Exception as e:
         logger.error(f"Error fetching tasks: {e}")
         return []

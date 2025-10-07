@@ -4,12 +4,37 @@ from app import database
 # Create Blueprint.
 bp = Blueprint('main', __name__)
 
+@bp.route('/debug/db-status')
+def debug_db_status():
+    try:
+        from app import database
+        from app.database import get_session
+        
+        # Test database connection
+        with get_session() as session:
+            result = session.execute("SELECT 1").fetchone()
+            
+        return jsonify({
+            "database_connection": "SUCCESS",
+            "test_query": str(result),
+            "environment": os.getenv("ENV", "Not set")
+        })
+    except Exception as e:
+        return jsonify({
+            "database_connection": "FAILED",
+            "error": str(e),
+            "environment": os.getenv("ENV", "Not set")
+        }), 500
+
 @bp.route('/')
 def index():
     try:
         items = database.fetch_todo()
+        logger.info(f"DEBUG: Rendering template with {len(items)} items")
+        logger.info(f"DEBUG: Items data: {items}")
         return render_template('index.html', items=items)
     except Exception as e:
+        logger.error(f"Error in index route: {e}")
         return render_template('index.html', items=[])
 
 @bp.route('/tasks', methods=['GET'])
