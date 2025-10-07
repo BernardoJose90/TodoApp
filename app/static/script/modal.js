@@ -236,3 +236,32 @@ $(document).ready(function() {
     console.log('✅ modal.js fully loaded and ready');
 });
 
+// Emergency modal population test
+function emergencyPopulate() {
+    console.log('🚨 Emergency modal population test');
+    
+    // Clear and set values manually
+    $('#task-desc').val('TEST DESCRIPTION');
+    $('#task-status').val('Todo');
+    $('#task-priority').val('Medium');
+    $('#task-due-date').val('2024-12-31');
+    $('#modal-title').text('Edit Task');
+    
+    // Show modal
+    const modal = document.getElementById('task-modal');
+    modal.style.display = 'block';
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+    document.body.appendChild(document.createElement('div')).className = 'modal-backdrop fade show';
+    
+    console.log('✅ Emergency modal shown with test data');
+    console.log('Current form values:', {
+        desc: $('#task-desc').val(),
+        status: $('#task-status').val(),
+        priority: $('#task-priority').val(),
+        dueDate: $('#task-due-date').val()
+    });
+}
+
+// Run the test
+emergencyPopulate();
