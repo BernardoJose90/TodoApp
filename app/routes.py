@@ -6,8 +6,11 @@ bp = Blueprint('main', __name__)
 
 @bp.route('/')
 def index():
-    return render_template('index.html')
-    
+    try:
+        items = database.fetch_todo()
+        return render_template('index.html', items=items)
+    except Exception as e:
+        return render_template('index.html', items=[])
 
 @bp.route('/tasks', methods=['GET'])
 def get_tasks():
@@ -22,7 +25,7 @@ def add_task():
     try:
         data = request.get_json()
         task_id = database.insert_new_task(
-            description=data.get('task'),
+            description=data.get('description'),  # CHANGED: 'task' to 'description'
             status=data.get('status', 'Todo'),
             priority=data.get('priority', 'Medium'),
             due_date=data.get('due_date')
@@ -40,7 +43,7 @@ def update_task(task_id):
         data = request.get_json()
         success = database.update_task(
             task_id=task_id,
-            description=data.get('task'),
+            description=data.get('description'),  # CHANGED: 'task' to 'description'
             status=data.get('status'),
             priority=data.get('priority'),
             due_date=data.get('due_date')

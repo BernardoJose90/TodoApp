@@ -64,7 +64,7 @@ $(document).ready(function() {
                 type: method,
                 contentType: 'application/json',
                 data: JSON.stringify({ 
-                    task: description,  // Changed from 'description' to 'task'
+                    description: description,  // CHANGED: 'task' to 'description'
                     status: status, 
                     priority: priority, 
                     due_date: due_date 
