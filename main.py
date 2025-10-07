@@ -6,7 +6,7 @@ from app.routes import bp
 template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app/templates")
 app = Flask(__name__, template_folder=template_dir)
 
-# Initialize database
+# Initialize databases
 try:
     database.create_tables()
     print("Database initialized successfully")
