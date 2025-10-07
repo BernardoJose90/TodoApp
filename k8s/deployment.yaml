@@ -1,12 +1,9 @@
-# Defines Kubernetes Deployment:
-# Number of replicas
-# Docker image to use
-# Environment variables
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: todo-app
+  name: todo-app-deployment
+  labels:
+    app: todo-app
 spec:
   replicas: 2
   selector:
@@ -17,21 +14,45 @@ spec:
       labels:
         app: todo-app
     spec:
+      serviceAccountName: todo-app-sa
       containers:
-      - name: todo-app
-        image: <your-dockerhub-username>/odo-list-app:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: AWS_REGION
-          value: "eu-west-2"
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: access_key
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: aws-credentials
-              key: secret_key
+        - name: todo-app
+          image: 851725622142.dkr.ecr.eu-west-2.amazonaws.com/webserver/todoapp:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: ENV
+              value: "AWS"
+            - name: AWS_REGION
+              value: "eu-west-2"
+            - name: FLASK_APP
+              value: "main.py"
+            - name: FLASK_RUN_HOST
+              value: "0.0.0.0"
+            - name: PYTHONPATH
+              value: "/app"
+            - name: AWS_STS_REGIONAL_ENDPOINTS
+              value: "regional"
+            - name: AWS_ROLE_ARN
+              value: "arn:aws:iam::851725622142:role/todo-app-rds-secret-read-Role"
+            - name: AWS_WEB_IDENTITY_TOKEN_FILE
+              value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 5
