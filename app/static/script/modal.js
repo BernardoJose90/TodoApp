@@ -1,11 +1,10 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - EDIT FIXED VERSION');
+    console.log('🔧 modal.js loaded - MODAL FIX VERSION');
 
-    // Remove the duplicate Sortable initialization - keep only one
     // DRAG-AND-DROP using Sortable
     new Sortable(document.getElementById('task-table-body'), {
         animation: 150,
-        handle: '.task-content', // Only allow dragging by the task content
+        handle: '.task-content',
         onEnd: function(evt) {
             let order = [];
             $('#task-table-body tr').each(function(index) {
@@ -35,7 +34,6 @@ $(document).ready(function() {
         const status = $(this).data('status');
         console.log('🔍 Filtering by status:', status);
         
-        // Update active state
         $('.filter-btn').removeClass('active');
         $(this).addClass('active');
         
@@ -114,14 +112,13 @@ $(document).ready(function() {
 
     // Add new task
     $('#task-modal').on('show.bs.modal', function(e) {
-        // Only reset if it's not an edit operation
         if (!$(e.relatedTarget).hasClass('edit')) {
             resetModal();
             setupSubmit();
         }
     });
 
-    // Edit task - SIMPLIFIED AND FIXED
+    // Edit task - FIXED MODAL TRIGGER
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -130,21 +127,18 @@ $(document).ready(function() {
         const row = $(this).closest('tr');
         
         console.log('✏️ Editing task ID:', taskId);
-        console.log('📊 Row data:', row.data());
 
-        // Get data directly from data attributes and elements
+        // Extract task data
         const description = row.find('.fw-semibold').first().text().trim();
         const status = row.data('status');
         const priority = row.find('.badge').first().text().trim();
         
-        // Get due date - try multiple locations
         let dueDate = '';
-        const dueDateCell = row.find('td').eq(4); // 5th column (0-indexed)
+        const dueDateCell = row.find('td').eq(4);
         if (dueDateCell.length && dueDateCell.text().trim() !== '-') {
             dueDate = dueDateCell.text().trim();
         }
         
-        // Fallback to small text in description column
         if (!dueDate) {
             const dueDateSmall = row.find('small');
             if (dueDateSmall.length) {
@@ -152,26 +146,21 @@ $(document).ready(function() {
             }
         }
 
-        console.log('📝 Extracted data:', { 
-            description, 
-            status, 
-            priority, 
-            dueDate,
-            taskId 
-        });
+        console.log('📝 Extracted data:', { description, status, priority, dueDate, taskId });
 
-        // Populate modal fields
+        // Populate modal
         $('#task-desc').val(description);
         $('#task-status').val(status);
         $('#task-priority').val(priority);
         $('#task-due-date').val(dueDate);
-        
         $('#modal-title').text('Edit Task');
-        
-        // Show modal
-        $('#task-modal').modal('show');
-        
-        // Setup submit handler for this task
+
+        // FIX: Use proper Bootstrap 5 modal show method
+        const modalElement = document.getElementById('task-modal');
+        const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Setup submit handler
         setupSubmit(taskId);
     });
 
@@ -202,7 +191,6 @@ $(document).ready(function() {
     // Refresh table helper
     function refreshTable() {
         console.log('🔄 Refreshing table...');
-        // Use location reload for now to ensure clean state
         location.reload();
     }
 
@@ -224,12 +212,5 @@ $(document).ready(function() {
     // Initialize stats
     updateStats();
 
-    // Debug: Check if edit buttons are properly bound
-    console.log('🔍 Edit buttons found:', $('.edit').length);
-    $('.edit').each(function(i) {
-        console.log(`  Edit button ${i}:`, {
-            id: $(this).data('id'),
-            text: $(this).find('i').attr('class')
-        });
-    });
+    console.log('🔍 Edit buttons ready:', $('.edit').length);
 });
