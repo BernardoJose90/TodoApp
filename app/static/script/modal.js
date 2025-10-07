@@ -1,34 +1,10 @@
 $(document).ready(function() {
-    console.log('🔧 modal.js loaded - FINAL WORKING VERSION');
+    console.log('🔧 modal.js loaded - CLEAN VERSION');
 
-    // SIMPLE MODAL FUNCTIONS
-    function showModal() {
-        console.log('🔄 Showing modal...');
-        const modal = document.getElementById('task-modal');
-        if (modal) {
-            modal.style.display = 'block';
-            modal.classList.add('show');
-            document.body.classList.add('modal-open');
-            
-            const backdrop = document.createElement('div');
-            backdrop.className = 'modal-backdrop fade show';
-            document.body.appendChild(backdrop);
-            
-            console.log('✅ Modal shown');
-        }
-    }
-
-    function hideModal() {
-        console.log('🔄 Hiding modal...');
-        const modal = document.getElementById('task-modal');
-        if (modal) {
-            modal.style.display = 'none';
-            modal.classList.remove('show');
-            document.body.classList.remove('modal-open');
-            
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach(backdrop => backdrop.remove());
-        }
+    // Initialize modal
+    let taskModal = null;
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        taskModal = new bootstrap.Modal(document.getElementById('task-modal'));
     }
 
     // DRAG-AND-DROP
@@ -109,7 +85,11 @@ $(document).ready(function() {
                 }),
                 success: function(response) {
                     console.log('✅ Task saved successfully');
-                    hideModal();
+                    if (taskModal) {
+                        taskModal.hide();
+                    } else {
+                        $('#task-modal').modal('hide');
+                    }
                     resetModal();
                     refreshTable();
                 },
@@ -136,55 +116,59 @@ $(document).ready(function() {
         console.log('➕ New Task button clicked');
         resetModal();
         setupSubmit();
-        showModal();
+        
+        if (taskModal) {
+            taskModal.show();
+        } else {
+            $('#task-modal').modal('show');
+        }
     });
 
-    // EDIT TASK - SIMPLE AND RELIABLE
+    // EDIT TASK - SIMPLE AND DIRECT
     $(document).on('click', '.edit', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         
         const taskId = $(this).data('id');
         const row = $(this).closest('tr');
         
         console.log('🎯 EDIT BUTTON CLICKED - ID:', taskId);
 
-        // SIMPLE DATA EXTRACTION - Using the working method from debug
+        // Extract data using the proven selectors
         const description = row.find('td').eq(1).find('.fw-semibold').text().trim();
         const status = row.data('status');
         const priority = row.find('td').eq(3).find('.badge').text().trim();
         let dueDate = row.find('td').eq(4).text().trim();
         if (dueDate === '-') dueDate = '';
 
-        console.log('📝 EXTRACTED DATA:', { description, status, priority, dueDate, taskId });
+        console.log('📝 EXTRACTED DATA:', { description, status, priority, dueDate });
 
-        // POPULATE MODAL - With small delay to ensure DOM is ready
-        setTimeout(() => {
-            $('#task-desc').val(description);
-            $('#task-status').val(status);
-            $('#task-priority').val(priority);
-            $('#task-due-date').val(dueDate);
-            $('#modal-title').text('Edit Task');
-            
-            console.log('✅ Modal populated with:', {
-                desc: $('#task-desc').val(),
-                status: $('#task-status').val(), 
-                priority: $('#task-priority').val(),
-                dueDate: $('#task-due-date').val()
-            });
-        }, 50);
+        // DIRECTLY populate modal fields
+        document.getElementById('task-desc').value = description;
+        document.getElementById('task-status').value = status;
+        document.getElementById('task-priority').value = priority;
+        document.getElementById('task-due-date').value = dueDate;
+        document.getElementById('modal-title').textContent = 'Edit Task';
+
+        console.log('✅ Modal populated directly with DOM');
 
         // Setup submit handler
         setupSubmit(taskId);
         
         // Show modal
-        showModal();
+        if (taskModal) {
+            taskModal.show();
+        } else {
+            $('#task-modal').modal('show');
+        }
     });
 
     // DELETE TASK
     $(document).on('click', '.delete', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         
         const taskId = $(this).data('id');
         console.log('🗑️ Deleting task ID:', taskId);
@@ -203,11 +187,6 @@ $(document).ready(function() {
                 alert("Error deleting task: " + error);
             }
         });
-    });
-
-    // CLOSE MODAL
-    $('#task-modal .btn-close, #task-modal .btn-secondary').on('click', function() {
-        hideModal();
     });
 
     // REFRESH TABLE
@@ -233,35 +212,5 @@ $(document).ready(function() {
 
     // INITIALIZE
     updateStats();
-    console.log('✅ modal.js fully loaded and ready');
+    console.log('✅ Clean modal.js loaded successfully');
 });
-
-// Emergency modal population test
-function emergencyPopulate() {
-    console.log('🚨 Emergency modal population test');
-    
-    // Clear and set values manually
-    $('#task-desc').val('TEST DESCRIPTION');
-    $('#task-status').val('Todo');
-    $('#task-priority').val('Medium');
-    $('#task-due-date').val('2024-12-31');
-    $('#modal-title').text('Edit Task');
-    
-    // Show modal
-    const modal = document.getElementById('task-modal');
-    modal.style.display = 'block';
-    modal.classList.add('show');
-    document.body.classList.add('modal-open');
-    document.body.appendChild(document.createElement('div')).className = 'modal-backdrop fade show';
-    
-    console.log('✅ Emergency modal shown with test data');
-    console.log('Current form values:', {
-        desc: $('#task-desc').val(),
-        status: $('#task-status').val(),
-        priority: $('#task-priority').val(),
-        dueDate: $('#task-due-date').val()
-    });
-}
-
-// Run the test
-emergencyPopulate();
